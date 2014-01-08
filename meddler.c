@@ -46,19 +46,30 @@ struct ip_packet {
   u_char data[0];           /* message data up to 64KB */
 };
 
-struct global_config {
+typedef struct global_config {
   int tun_fd;
-  pcap_t* wifi_pcap=NULL;
+  pcap_t* wifi_pcap;
   u_char * tun_frame;
   int tun_frame_len;
   u_char * key;
-} ;
-struct global_config config;
+
+  u_char * sender_public_key;
+  u_char * sender_private_key;
+  
+  u_char * receiver_public_key;
+  u_char * receiver_private_key;
+  
+} config_;
+
+config_ config;
+
 static int debug_;
-void packet_parse(const unsigned char *, struct timeval, unsigned int);
+int  packet_parse(const unsigned char *, struct timeval, unsigned int);
 u_int32_t covert_message_offset(u_int32_t ,u_int32_t , int );
+int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int32_t capture_len);
+int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int32_t capture_len);
 int framing_covert_message(u_char*,int );
-int transmit_on_wifi(u_char *);
+int transmit_on_wifi(u_char *,int);
 int tun_alloc(char *);
 
 
@@ -94,8 +105,8 @@ pcap_t * pcap_radiotap_handler(char * file_d){
     pcap = pcap_open_offline(file_d, errbuf);
   else
     {
-      file_d="phy0";
-      pcap=pcap_open_live(file_d, 1500 , -1, errbuf);
+      file_d="phy6";
+      pcap=pcap_open_live(file_d, 1500 , 1,20, errbuf);//check the timeout value 
     }
   if( pcap == NULL)
     {
@@ -114,23 +125,24 @@ pcap_t * pcap_radiotap_handler(char * file_d){
   return pcap;
 }
 
-int transmit_on_wifi(u_char* frame_to_transmit)
+int transmit_on_wifi(u_char* frame_to_transmit, int pkt_len)
 {
   //open pcap file descripter
   //modify the radiotap IEEE80211_RADIOTAP_F_FCS bit in radiotap 
-  r = pcap_inject(config.wifi_pcap, frame_to_transmit, pu8 - u8aSendBuffer);
-  if (r != (pu8-u8aSendBuffer)) {
+  u_int32_t r;
+  r = pcap_inject(config.wifi_pcap, frame_to_transmit, pkt_len);
+  if (r != (pkt_len)){
     perror("Trouble injecting packet");
-    return (1);
+    return -1;
   }
-
+  return 0;
 }
 
 u_int32_t covert_message_offset(u_int32_t seq,u_int32_t ack, int pkt_len)
 {
+  //have to use the shared key of the session to produce this number again!x
   u_int32_t offset=0,i=0,int_digest=0;
   offset =32;
-
   return offset ;
 }
 
@@ -150,7 +162,7 @@ int framing_covert_message(u_char* frame_new_offset,int remaining_len)
   //take out the HMAC of the encrypted frame
   memcpy(frame_new_offset,hmac, hmac_s);
   memcpy(frame_new_offset+hmac_s,(u_char*)&config.tun_frame_len,sizeof(config.tun_frame_len));
-  memcpy(frame_new_offset+hmac_s+sizeof(int), config.tun_frame, config.tun_frame);
+  memcpy(frame_new_offset+hmac_s+sizeof(int),config.tun_frame, config.tun_frame_len);
   return 0;
 }
 /*
@@ -159,9 +171,92 @@ int framing_covert_message(u_char* frame_new_offset,int remaining_len)
   get the tun frame that should be written to the tun descriptor
 
 */
-int message_reception(const unsigned char * packet)
+int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int32_t capture_len)
 {
-  
+
+  struct ip *ip;
+  struct udp_hdr *udp;
+  struct llc_hdr *llc;
+  struct tcp_hdr *tcp_h;
+  struct ssl_hdr *ssl_h;
+  u_int16_t IP_header_length,fc;
+  u_int32_t message_offset;
+  u_int32_t pkt_len=capture_len;
+  int tcp_options =TCP_OPTIONS; //TCP options
+  int bytes_written =0;
+  packet += radiotap_len;
+  capture_len -= radiotap_len;
+  const u_char* packet_start=packet;
+  fc = EXTRACT_LE_16BITS(packet);
+  struct ieee80211_hdr * sc = (struct ieee80211_hdr *)packet;
+  int mac_hdr_len  = (FC_TO_DS(fc) && FC_FROM_DS(fc)) ? 30 : 24;  
+  if (DATA_FRAME_IS_QOS(FC_SUBTYPE(fc)))
+    mac_hdr_len += 2;
+  packet +=(mac_hdr_len+8);
+  capture_len -= (mac_hdr_len+8);
+  llc = (struct llc_hdr *) packet;
+  if (ntohs(llc->snap.ether_type) == ETHERTYPE_IP){
+    packet +=sizeof(struct llc_hdr);
+    capture_len -= sizeof(struct llc_hdr);
+    ip = (struct ip*)packet;
+    IP_header_length = ip->ip_hl * 4;
+    if (ip->ip_p != IPPROTO_TCP)
+     { /*Has to be a TCP connection eg. gmail*/
+       return -1;
+     }
+
+    packet += IP_header_length;
+    capture_len -= IP_header_length;
+    tcp_h = (struct tcp_hdr *)packet;
+    //printf("sport number = %d, seq no. = %u,ack no. = %u
+    //\n",ntohs(tcp_h->dport),ntohl(tcp_h->seq),ntohl(tcp_h->ack));
+    message_offset = covert_message_offset(ntohl(tcp_h->seq),ntohl(tcp_h->ack),pkt_len);
+    packet +=sizeof(struct tcp_hdr);
+    capture_len -= sizeof(struct tcp_hdr);
+
+    packet += tcp_options;
+    capture_len -= tcp_options;
+    ssl_h = (struct ssl_hdr *)packet;
+    if (ssl_h->ssl_content_type != 0x17)
+      return ; /*there should be content in the traffic*/
+
+    printf("ssl v= %02x %02x%02x %02x%02x \n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1), 
+	   *((u_int8_t*)(ssl_h)+2), *((u_int8_t*)(ssl_h)+3), *((u_int8_t*)(ssl_h)+4) );
+
+    packet += sizeof(struct ssl_hdr);
+    capture_len -= sizeof(struct ssl_hdr);
+
+    int remaining_bytes=capture_len-(CRC_BYTES_LEN+ H_MAC_BYTES_LEN+ MSG_BYTES_LEN+ message_offset);
+    if (remaining_bytes <MAX_MESSAGE_SIZE+1)
+      return -1; /*for now it's mtu=150 bytes*/
+    /* TODO:
+       use the key to decrypt the length of message following it       
+      
+     */
+    packet +=message_offset;
+    u_char* hmac;
+    hmac=malloc(sizeof(int));
+    memset(hmac,'0',sizeof(int));
+    memcpy(hmac,packet, sizeof(hmac));
+    packet +=sizeof(hmac);
+    int mesg_size=0;
+    memcpy((u_char*)&mesg_size, packet,sizeof(int));
+    printf("message size is %d \n",mesg_size);
+    u_char* message;
+    message=malloc(mesg_size);
+    //calculate the hmac of it using function
+    u_char* calculated_hmac;
+    
+    if(!memcmp(calculated_hmac,hmac,sizeof(hmac)))
+      { 
+	//Take the message packet and write it to the tun descriptor
+	if(bytes_written=write(config.tun_fd,message,mesg_size)<0)
+	  {
+	    perror("Error in writing the message frame to TUN interface\n");
+	    exit(-1);
+	  }
+      }
+  }  
   return 0;
 }
 /*
@@ -233,21 +328,23 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
        Transmit
      */
     char* frame_to_transmit=NULL;
+    int len_frame_to_transmit =0;
     int copy_len= radiotap_len+ mac_hdr_len+sizeof(struct ip)+ sizeof(struct llc_hdr)+8+ \
       sizeof(struct tcp_hdr)+TCP_OPTIONS+sizeof(struct ssl_hdr)+message_offset;
-    frame_to_transmit=malloc(pkt_len-CRC_BYTES_LEN);
+    frame_to_transmit=malloc(pkt_len);
     memset(frame_to_transmit,'\0',sizeof(frame_to_transmit));
     memcpy(frame_to_transmit,packet_start,copy_len);
     framing_covert_message(frame_to_transmit+copy_len,remaining_bytes);
     debug_++;
-    transmit_on_wifi(frame_to_transmit);
+    transmit_on_wifi(frame_to_transmit,pkt_len);
     free(frame_to_transmit);
     if (debug_ >100)
       exit(1);
   }
+
   return 0 ;
 }
-void packet_parse(const unsigned char *packet, struct timeval ts,unsigned int capture_len)
+int  packet_parse(const unsigned char *packet, struct timeval ts,unsigned int capture_len)
 {
   u_int16_t radiotap_len=0;
   u_int32_t present=0;
@@ -259,13 +356,14 @@ void packet_parse(const unsigned char *packet, struct timeval ts,unsigned int ca
     { /*messages are contained in large frames only*/
       return ;
     }
-  if (radiotap_len !=14)
+  if (radiotap_len ==14)
     {
-      message_reception(packet);      
+      message_injection(packet, radiotap_len, capture_len);      
     }
   else 
     {/*need frames that are sent out through device */
-      message_injection(packet,radiotap_len, capture_len);
+      message_reception(packet, radiotap_len, capture_len);    
+
     }
 }
 
@@ -275,10 +373,10 @@ int main()
 {
   char buf[PACKET_SIZE];
   char ifname[IFNAMSIZ];
-  int tun_frame_cap_len, fd;
+  int tun_frame_cap_len, fd,rad_ret;
   struct ip *ip;
   struct udp_hdr *udp;
-  u_char * radiotap_packet=NULL;
+  const u_char * radiotap_packet;
   struct pcap_pkthdr header;
   char *mon_interface ="realgmail.pcap";
   config.wifi_pcap= pcap_radiotap_handler(mon_interface);
@@ -342,7 +440,10 @@ int main()
     printf("read %d bytes from tunnel interface %s.\n-----\n", tun_frame_cap_len, ifname);
     while (1){
       radiotap_packet = pcap_next(config.wifi_pcap, &header);
-      packet_parse(radiotap_packet, header.ts, header.caplen);
-  }    
+      rad_ret = packet_parse(radiotap_packet, header.ts, header.caplen);
+      if (rad_ret == 0)
+	break;
+    }
+  }
   return 0;
 }
