@@ -9,6 +9,7 @@
 #include <sys/ioctl.h>
 #include <netinet/ip.h>
 #include <linux/if_tun.h>
+#include <errno.h>
 #include <netinet/if_ether.h>
 
 #include <netinet/in.h>
@@ -48,6 +49,7 @@ struct ip_packet {
 
 typedef struct global_config {
   int tun_fd;
+  int pcap_fd;
   pcap_t* wifi_pcap;
   u_char * tun_frame;
   int tun_frame_len;
@@ -367,19 +369,67 @@ int  packet_parse(const unsigned char *packet, struct timeval ts,unsigned int ca
     }
 }
 
+int process_tun_frame(u_char* orig_covert_frame, int tun_frame_cap_len){
+  struct ip *ip;
+  struct udp_hdr *udp;
+  
+  ip = (struct ip *) orig_covert_frame;
+  struct ip_packet * p= (struct ip_packet*) orig_covert_frame;
+  if (tun_frame_cap_len < ip->ip_hl*4 )
+    { /* didn't capture the full IP header including options */
+      printf("IP header with options\n");
+      return;
+    }
+  
+  u_int16_t frag_offset =ntohs(ip->ip_off);
+  u_int8_t dont_frag = frag_offset && 0x2;
+  u_int8_t more_frag = frag_offset && 0x3;
+  u_int16_t offset = frag_offset>>3 ;
+  printf("ip offset is offset=%u dont_frag=%u more_frag=%u\n", offset, dont_frag, more_frag);
+  printf("ip morefrags=%u dont_frag=%u frag_offset=%u\n", p->more_frags, p->dont_frag, p->frag_offset);
+  
+  if (ip->ip_p == IPPROTO_UDP)
+    {
+      printf("UDP packet\n");
+      /* Skip over the IP header to get to the UDP header. */
+      orig_covert_frame += ip->ip_hl*4;
+      udp = (struct udp_hdr*)orig_covert_frame;
+      printf("UDP src_port=%d dst_port=%d length=%d\n",
+	     ntohs(udp->uh_sport),
+	     ntohs(udp->uh_dport),
+	     ntohs(udp->uh_ulen));
+    }
+    else if (ip->ip_p == IPPROTO_TCP)
+      {
+	printf("TCP packet %d\n",ip->ip_p);
+      }
+    else {
+      printf("none of TCP/UDP \n");
+      return ;
+    }
+  config.tun_frame=orig_covert_frame;
+  config.tun_frame_len=tun_frame_cap_len;
+  // send this on raw socket
+}
+
+
 int main()
 {
   char buf[PACKET_SIZE];
   char ifname[IFNAMSIZ];
   int tun_frame_cap_len,rad_ret;
-  struct ip *ip;
-  struct udp_hdr *udp;
   const u_char * radiotap_packet;
   struct pcap_pkthdr header;
   char *mon_interface ="realgmail.pcap";
   config.key = "20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
 
   config.wifi_pcap= pcap_radiotap_handler(mon_interface);
+  if (pcap_setnonblock(config.wifi_pcap, 1, errbuf) == -1) {
+    fprintf(stderr, "pcap_setnonblock failed: %s\n", errbuf);
+    exit(2);
+  }
+  config.pcap_fd = pcap_get_selectable_fd(config.wifi_pcap);
+
   //strcpy(ifname, "tun%d");
   strcpy(ifname, "tun2");
   if ((config.tun_fd= tun_alloc(ifname)) < 0) {
@@ -387,60 +437,49 @@ int main()
         exit(1);
   }
   printf("allocted tunnel interface %s\n", ifname);
+  int maxfd = (config.tun_fd > config.pcap_fd)?config.tun_fd:config.pcap_fd;
 
-  for (;;) {
-    memset(buf,sizeof(buf), 0);
-    if ((tun_frame_cap_len = read(config.tun_fd, buf, sizeof(buf))) < 0) {
-      perror("read() on tun file descriptor");
-      close(config.tun_fd);
-      exit(1);
-    }
-    u_char *orig_covert_frame= malloc(tun_frame_cap_len);
-    memset(orig_covert_frame, tun_frame_cap_len, 0);
-    memcpy(orig_covert_frame, buf, tun_frame_cap_len);
-    ip = (struct ip *) orig_covert_frame;
-    struct ip_packet * p= (struct ip_packet*) orig_covert_frame;
-    if (tun_frame_cap_len < ip->ip_hl*4 )
-      { /* didn't capture the full IP header including options */
-	printf("IP header with options\n");
-	continue;
-      }
+  while(1)
+  {
+    int ret;
+    fd_set rd_set;
     
-    u_int16_t frag_offset =ntohs(ip->ip_off);
-    u_int8_t dont_frag = frag_offset && 0x2;
-    u_int8_t more_frag = frag_offset && 0x3;
-    u_int16_t offset = frag_offset>>3 ;
-    printf("ip offset is offset=%u dont_frag=%u more_frag=%u\n", offset, dont_frag, more_frag);
-    printf("ip morefrags=%u dont_frag=%u frag_offset=%u\n", p->more_frags, p->dont_frag, p->frag_offset);
-
-    if (ip->ip_p == IPPROTO_UDP)
-      {
-	printf("UDP packet\n");
-	/* Skip over the IP header to get to the UDP header. */
-	orig_covert_frame += ip->ip_hl*4;
-	udp = (struct udp_hdr*)orig_covert_frame;
-	printf("UDP src_port=%d dst_port=%d length=%d\n",
-	       ntohs(udp->uh_sport),
-	       ntohs(udp->uh_dport),
-	       ntohs(udp->uh_ulen));
-      }
-    else if (ip->ip_p == IPPROTO_TCP)
-      {
-	printf("TCP packet %d\n",ip->ip_p);
-      }
-    else {
-      printf("none of TCP/UDP \n");
+    FD_ZERO(&rd_set);
+    FD_SET(config.tun_fd, &rd_set); 
+    FD_SET(config.pcap_fd, &rd_set);
+    
+    ret = select(maxfd + 1, &rd_set, NULL, NULL, NULL);
+    
+    if (ret < 0 && errno == EINTR){
       continue;
     }
-    config.tun_frame=orig_covert_frame;
-    config.tun_frame_len=tun_frame_cap_len;
-    printf("read %d bytes from tunnel interface %s.\n-----\n", tun_frame_cap_len, ifname);
-    while (1){
-      radiotap_packet = pcap_next(config.wifi_pcap, &header);
-      rad_ret = packet_parse(radiotap_packet, header.ts, header.caplen);
-      if (rad_ret == 0)
-	break;
+    
+    if (ret < 0) {
+      perror("select()");
+      exit(1);
     }
+    if(FD_ISSET(config.tun_fd, &rd_set))
+      {
+	memset(buf,sizeof(buf), 0);
+	if ((tun_frame_cap_len = read(config.tun_fd, buf, sizeof(buf))) < 0) 
+	  {
+	    perror("read() on tun file descriptor");
+	    close(config.tun_fd);
+	    exit(1);
+	  }
+	u_char *orig_covert_frame= malloc(tun_frame_cap_len);
+	memset(orig_covert_frame, tun_frame_cap_len, 0);
+	memcpy(orig_covert_frame, buf, tun_frame_cap_len);
+	process_tun_frame ( orig_covert_frame, tun_frame_cap_len);
+	printf("read %d bytes from tunnel interface %s.\n-----\n", tun_frame_cap_len, ifname);
+      }
+    
+    if(FD_ISSET(config.pcap_fd, &rd_set))
+      {
+      radiotap_packet = pcap_next(config.wifi_pcap, &header);
+      rad_ret = packet_parse(radiotap_packet, header.ts, header.caplen);	
+      }
+    
   }
   return 0;
 }
