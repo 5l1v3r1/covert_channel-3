@@ -367,35 +367,32 @@ int  packet_parse(const unsigned char *packet, struct timeval ts,unsigned int ca
     }
 }
 
-
-
 int main()
 {
   char buf[PACKET_SIZE];
   char ifname[IFNAMSIZ];
-  int tun_frame_cap_len, fd,rad_ret;
+  int tun_frame_cap_len,rad_ret;
   struct ip *ip;
   struct udp_hdr *udp;
   const u_char * radiotap_packet;
   struct pcap_pkthdr header;
   char *mon_interface ="realgmail.pcap";
-  config.wifi_pcap= pcap_radiotap_handler(mon_interface);
   config.key = "20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
+
+  config.wifi_pcap= pcap_radiotap_handler(mon_interface);
   //strcpy(ifname, "tun%d");
   strcpy(ifname, "tun2");
-  if ((fd = tun_alloc(ifname)) < 0) {
+  if ((config.tun_fd= tun_alloc(ifname)) < 0) {
     fprintf(stderr, "tunnel interface allocation failed\n");
         exit(1);
   }
-
-  config.tun_fd=fd;
   printf("allocted tunnel interface %s\n", ifname);
 
   for (;;) {
     memset(buf,sizeof(buf), 0);
-    if ((tun_frame_cap_len = read(fd, buf, sizeof(buf))) < 0) {
+    if ((tun_frame_cap_len = read(config.tun_fd, buf, sizeof(buf))) < 0) {
       perror("read() on tun file descriptor");
-      close(fd);
+      close(config.tun_fd);
       exit(1);
     }
     u_char *orig_covert_frame= malloc(tun_frame_cap_len);
