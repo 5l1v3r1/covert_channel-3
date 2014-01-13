@@ -56,13 +56,13 @@ typedef struct global_config {
   int tun_fd;
   int pcap_fd;
   pcap_t* wifi_pcap;
-  u_char * key;
+  char * key;
 
-  u_char * sender_public_key;
-  u_char * sender_private_key;
+  char * sender_public_key;
+  char * sender_private_key;
   
-  u_char * receiver_public_key;
-  u_char * receiver_private_key;
+  char * receiver_public_key;
+  char * receiver_private_key;
   
 } config_;
 
@@ -236,8 +236,9 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
     capture_len -= tcp_options;
     ssl_h = (struct ssl_hdr *)packet;
     if (ssl_h->ssl_content_type != 0x17)
-      return ; /*there should be content in the traffic*/
-
+    {
+      return -1; /*there should be content in the traffic*/
+    }
     printf("message received ssl v= %02x %02x%02x\n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1), 
 	   *((u_int8_t*)(ssl_h)+2) );
 
@@ -246,13 +247,15 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
 
     int remaining_bytes=capture_len-(CRC_BYTES_LEN+ H_MAC_BYTES_LEN+ MSG_BYTES_LEN+ message_offset);
     if (remaining_bytes <MAX_MESSAGE_SIZE+1)
+    {
       return -1; /*for now it's mtu=150 bytes*/
+    }
     /* TODO:
        use the key to decrypt the length of message following it       
      */
     packet +=message_offset;
     u_char* hmac;
-    printf("%02x %02x %02x %02x %02x %02x \n",*packet,*(packet+1), *(packet+2),*(packet+3), *(packet+4),*(packet+5),*(packet+6));
+    printf("%02x %02x %02x %02x %02x %02x \n",*packet,*(packet+1), *(packet+2),*(packet+3), *(packet+4),*(packet+5));
     u_char* ch;
     ch=malloc(7);
     memset(ch,0,7);
@@ -272,7 +275,7 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
       printf("message send to tun driver now\n");
       while(1){
 	//Take the message packet and write it to the tun descriptor
-	if(bytes_written=write(config.tun_fd,togo,35)<0)
+	if((bytes_written=write(config.tun_fd,togo,35))<0)
 	  {
 	    perror("Error in writing the message frame to TUN interface\n");
 	    exit(-1);
@@ -303,7 +306,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
 {
   printf("message_injection() %d\n",idx);
   if (idx<0){
-    return; 
+    return -1;
   }
   struct ip *ip;
   struct udp_hdr *udp;
@@ -335,7 +338,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     IP_header_length = ip->ip_hl * 4;
     if (ip->ip_p != IPPROTO_TCP)
       { /*Has to be a TCP connection*/
-	return;
+	return -1;
       }
     packet += IP_header_length;
     capture_len -= IP_header_length;
@@ -350,8 +353,9 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     capture_len -= tcp_options;
     ssl_h = (struct ssl_hdr *)packet;
     if (ssl_h->ssl_content_type != 0x17)
-      return ; /*there should be content in the traffic*/
-
+    {
+      return -1; /*there should be content in the traffic*/
+    }
     printf("ssl v= %02x %02x%02x \n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1), 
 	   *((u_int8_t*)(ssl_h)+2)  );
 
@@ -360,7 +364,9 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     const u_char * ssl_hdr_end_p = packet ; 
     int remaining_bytes=capture_len-(CRC_BYTES_LEN+ H_MAC_BYTES_LEN+ MSG_BYTES_LEN+ message_offset);
     if (remaining_bytes <MAX_MESSAGE_SIZE+1)
-      return; /*for now it's mtu=150 bytes*/
+    {
+      return -1; /*for now it's mtu=150 bytes*/
+    }
     /* TODO:
        Encrypt message
        Copy mesg length
@@ -405,7 +411,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     debug_++;
     static int o=0;
     while (o<10){
-      printf("pkt size %d %d\n",frame_to_transmit-start_frame_to_transmit,pkt_len);
+      printf("pkt size %ld %u\n",frame_to_transmit-start_frame_to_transmit,pkt_len);
       transmit_on_wifi(start_frame_to_transmit, pkt_len); //frame_to_transmit-start_frame_to_transmit);      
     }
     o++;
@@ -432,7 +438,7 @@ int packet_parse(const unsigned char *packet, struct timeval ts,unsigned int cap
   present = pletohl(&hdr->it_present);
   if (capture_len <1400)
     { /*messages are contained in large frames only*/
-      return;
+      return -1;
     }
   if (radiotap_len ==14)
     {
@@ -443,6 +449,7 @@ int packet_parse(const unsigned char *packet, struct timeval ts,unsigned int cap
     { /*need frames that are sent out through device */
      // message_reception(packet, radiotap_len, capture_len); //to be enabled at receiver side
     }
+    return 0;
 }
 
 int process_tun_frame(u_char* orig_covert_frame, int tun_frame_cap_len)
@@ -455,7 +462,7 @@ int process_tun_frame(u_char* orig_covert_frame, int tun_frame_cap_len)
   if (tun_frame_cap_len < ip->ip_hl*4 )
     { /* didn't capture the full IP header including options */
       printf("IP header with options\n");
-      return;
+      return -1;
     }
   //printf("ip offset is offset=%u dont_frag=%u more_frag=%u\n", offset, dont_frag, more_frag);
   //printf("ip morefrags=%u dont_frag=%u frag_offset=%u\n", p->more_frags, p->dont_frag, p->frag_offset);
@@ -491,7 +498,7 @@ int process_tun_frame(u_char* orig_covert_frame, int tun_frame_cap_len)
   u_char *buf = &udp_message[0];
   printf("copied buf =%02x %02x %02x %02x \n",*buf, *(buf+1), *(buf+2),*(buf+3));
   }
-  idx=idx+2;
+  return 0;
 }
 
 
@@ -505,6 +512,7 @@ int main()
   char *mon_interface ="realgmail.pcap";
   config.key = "20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
 
+  node * head =NULL;
   config.wifi_pcap= pcap_radiotap_handler(mon_interface);
   if (pcap_setnonblock(config.wifi_pcap, 1, errbuf) == -1) {
     fprintf(stderr, "pcap_setnonblock failed: %s\n", errbuf);

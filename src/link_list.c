@@ -2,12 +2,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-struct node{
-  u_char* data;
-  int data_len;
-  struct node *next;
-};
-typedef struct node node;
+#include "link_list.h"
+
+
+
+
 static list_size=0;
 node * head =NULL;
 int beg_add_element(u_char *blob,int blob_size)
