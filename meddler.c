@@ -4,20 +4,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <net/if.h>
-#include <stdint.h>
-#include <net/if.h>
 #include <sys/ioctl.h>
-#include <netinet/ip.h>
 #include <linux/if_tun.h>
-#include <errno.h>
-#include <netinet/if_ether.h>
-
+#include <netinet/ip.h>
 #include <netinet/in.h>
+#include <netinet/if_ether.h>
 #include <net/if.h>
+#include <errno.h>
 
 #include "include/ieee802_11_radio.h"
 #include "include/header.h"
-#include <math.h>
 #include <pcap.h>
 
 #define PACKET_SIZE 1515
@@ -55,25 +51,6 @@ char errbuf[PCAP_ERRBUF_SIZE];
 static int idx=-1;
 static int ridx=0;
 
-struct ip_packet {
-  uint header_len:4;       /* header length in words in 32bit words */
-  uint version:4;          /* 4-bit version */
-  uint serve_type:8;       /* how to service packet */
-  uint packet_len:16;      /* total size of packet in bytes */
-  uint ID:16;              /* fragment ID */
-  uint frag_offset:13;     /* to help reassembly */
-  uint more_frags:1;       /* flag for "more frags to follow" */
-  uint dont_frag:1;        /* flag to permit fragmentation */
-  uint __reserved:1;       /* always zero */
-  uint time_to_live:8;     /* maximum router hop count */
-  uint protocol:8;         /* ICMP, UDP, TCP */
-  uint hdr_chksum:16;      /* ones-comp. checksum of header */
-  u_char IPv4_src[4]; /* IP address of originator */
-  u_char IPv4_dst[4]; /* IP address of destination */
-  u_char options[0];        /* up to 40 bytes */
-  u_char data[0];           /* message data up to 64KB */
-};
-
 typedef struct global_config {
   int tun_fd;
   int pcap_fd;
@@ -91,7 +68,7 @@ typedef struct global_config {
 config_ config;
 
 int udp_message_len[5];
-u_char udp_message[5][150];
+u_char* udp_message; //[5][150];
 static int debug_;
 int packet_parse(const unsigned char *, struct timeval, unsigned int);
 u_int32_t covert_message_offset(u_int32_t ,u_int32_t , int );
@@ -177,7 +154,7 @@ u_int32_t covert_message_offset(u_int32_t seq,u_int32_t ack, int pkt_len)
 {
   //have to use the shared key of the session to produce this number again!x
   u_int32_t offset=0,i=0,int_digest=0;
-  offset =32;
+  offset =2;
   return offset ;
 }
 
@@ -188,8 +165,8 @@ u_int32_t covert_message_offset(u_int32_t seq,u_int32_t ack, int pkt_len)
 */
 int framing_covert_message(u_char* frame_new_offset,int remaining_len)
 {
-  if (remaining_len < udp_message_len[idx])
-    return -1;
+  //if (remaining_len < udp_message_len[idx])
+  //  return -1;
   int a =0;
   u_char * hmac= "this is the new hmac";
   int hmac_s = sizeof("this is the new hmac");
@@ -274,19 +251,36 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
      */
     packet +=message_offset;
     u_char* hmac;
-    if (!memcmp(packet, "this", sizeof("this")))
-    {
-       printf("got a packet!\n");
-       exit(0);
+    printf("%02x %02x %02x %02x %02x %02x \n",*packet,*(packet+1), *(packet+2),*(packet+3), *(packet+4),*(packet+5),*(packet+6));
+    u_char* ch;
+    ch=malloc(7);
+    memset(ch,0,7);
+    memcpy(ch,packet,7);
+    if(!memcmp(ch,"abhinav",7))
+      {
+        printf("ch abhinav got shit!");
+        exit(1);
+      }
+    if(*packet==0x45){
+      printf("got ip packet\n");
+
+      u_char * togo=malloc(35);
+      memset(togo,0,35);
+      memcpy(togo,packet,35);
+
+      printf("message send to tun driver now\n");
+      while(1){
+	//Take the message packet and write it to the tun descriptor
+	if(bytes_written=write(config.tun_fd,togo,35)<0)
+	  {
+	    perror("Error in writing the message frame to TUN interface\n");
+	    exit(-1);
+	  }
+	sleep(3);
+      }
+      free(togo);
     }
-    hmac=malloc(sizeof(int));
-    memset(hmac,'0',sizeof(int));
-    memcpy(hmac,packet, sizeof(hmac));
-    packet +=sizeof(hmac);
-    int mesg_size=0;
     //calculate the hmac of it using function
-    u_char* calculated_hmac;
-    printf("message send to tun driver now\n");
     /*
     if(!memcmp(calculated_hmac,hmac,sizeof(hmac)))
       { 
@@ -297,7 +291,7 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
 	    exit(-1);
 	  }
       }
-    */
+   */ 
   }  
   return 0;
 }
@@ -320,6 +314,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
   u_int32_t pkt_len=capture_len;
   int tcp_options =TCP_OPTIONS; //TCP options
 
+  const u_char* llc_start_p ;
   const u_char* packet_start=packet;
   packet += radiotap_len;
   capture_len -= radiotap_len;
@@ -329,6 +324,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
   if (DATA_FRAME_IS_QOS(FC_SUBTYPE(fc)))
     mac_hdr_len += 2;
   packet +=(mac_hdr_len+8);
+  llc_start_p= packet;   
   capture_len -= (mac_hdr_len+8);
   llc = (struct llc_hdr *) packet;
   if (ntohs(llc->snap.ether_type) == ETHERTYPE_IP){
@@ -360,7 +356,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
 
     packet += sizeof(struct ssl_hdr);
     capture_len -= sizeof(struct ssl_hdr);
-
+    const u_char * ssl_hdr_end_p = packet ; 
     int remaining_bytes=capture_len-(CRC_BYTES_LEN+ H_MAC_BYTES_LEN+ MSG_BYTES_LEN+ message_offset);
     if (remaining_bytes <MAX_MESSAGE_SIZE+1)
       return; /*for now it's mtu=150 bytes*/
@@ -383,17 +379,37 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     u_char* start_frame_to_transmit= frame_to_transmit;
     memcpy(frame_to_transmit, u8aRadiotapHeader,sizeof (u8aRadiotapHeader));
     frame_to_transmit += sizeof (u8aRadiotapHeader);
+
     memcpy(frame_to_transmit, u8aIeeeHeader, sizeof (u8aIeeeHeader));
     frame_to_transmit += sizeof (u8aIeeeHeader);
+     
+
+    memcpy(frame_to_transmit, llc_start_p, ssl_hdr_end_p - llc_start_p );
+    frame_to_transmit += ssl_hdr_end_p-llc_start_p;
+    memcpy(frame_to_transmit,ssl_hdr_end_p,message_offset);
+    frame_to_transmit +=message_offset;
+
+    /*testing*
     memcpy(frame_to_transmit,"abhinav abhinav", sizeof("abhinav abhinav"));
     frame_to_transmit += sizeof("abhinav abhinav");
+    */
+    u_char * y= udp_message;
+    udp_message_len[0]=148;
+    printf("udp copied %02x %02x %02x %02x \n",*y, *(y+1), *(y+2),*(y+3));
+    memcpy(frame_to_transmit,udp_message,148);
+    printf("fr_to_tx: %02x %02x %02x %02x \n",*(frame_to_transmit),*(frame_to_transmit+1),*(frame_to_transmit+2), *(frame_to_transmit+3));
+    frame_to_transmit +=udp_message_len[0] ;
     //memcpy(frame_to_transmit,packet_start,copy_len);
     //framing_covert_message(frame_to_transmit+copy_len,remaining_bytes);
     debug_++;
-    while (1){
+    static int o=0;
+    while (o<10){
       printf("pkt size %d %d\n",frame_to_transmit-start_frame_to_transmit,pkt_len);
-      transmit_on_wifi(start_frame_to_transmit,frame_to_transmit-start_frame_to_transmit);      
+      transmit_on_wifi(start_frame_to_transmit, pkt_len); //frame_to_transmit-start_frame_to_transmit);      
     }
+    o++;
+    if (o>10)
+        exit(1);
     free(frame_to_transmit);
     if (debug_ >100){
       printf("abhinav: >100\n");
@@ -424,7 +440,7 @@ int packet_parse(const unsigned char *packet, struct timeval ts,unsigned int cap
     }
   else 
     { /*need frames that are sent out through device */
-     // message_reception(packet, radiotap_len, capture_len);
+     // message_reception(packet, radiotap_len, capture_len); //to be enabled at receiver side
     }
 }
 
@@ -440,17 +456,12 @@ int process_tun_frame(u_char* orig_covert_frame, int tun_frame_cap_len)
       printf("IP header with options\n");
       return;
     }
-  
-  u_int16_t frag_offset =ntohs(ip->ip_off);
-  u_int8_t dont_frag = frag_offset && 0x2;
-  u_int8_t more_frag = frag_offset && 0x3;
-  u_int16_t offset = frag_offset>>3 ;
   //printf("ip offset is offset=%u dont_frag=%u more_frag=%u\n", offset, dont_frag, more_frag);
   //printf("ip morefrags=%u dont_frag=%u frag_offset=%u\n", p->more_frags, p->dont_frag, p->frag_offset);
   
   if (ip->ip_p == IPPROTO_UDP)
     {
-      printf("UDP packet\n");
+      printf("UDP packet on TUN interface\n");
       /* Skip over the IP header to get to the UDP header. */
       orig_covert_frame += ip->ip_hl*4;
       udp = (struct udp_hdr*)orig_covert_frame;
@@ -472,12 +483,14 @@ int process_tun_frame(u_char* orig_covert_frame, int tun_frame_cap_len)
     }
   printf("start with copyess_tun_frame %d\n",tun_frame_cap_len);
   // send this on raw socket
-  udp_message_len[idx]=tun_frame_cap_len;
-  printf("yap%d\n",idx);
-  idx++;
-  memcpy(&udp_message[idx][0],orig_covert_frame, tun_frame_cap_len);
-  printf("yep%d\n",idx);
+  if (idx <0){
+  udp_message_len[0]=tun_frame_cap_len;
+   // memcpy(udp_message,orig_covert_frame, tun_frame_cap_len);
   printf("done with process_tun_frame %d\n",idx);
+  u_char *buf = &udp_message[0];
+  printf("copied buf =%02x %02x %02x %02x \n",*buf, *(buf+1), *(buf+2),*(buf+3));
+  }
+  idx=idx+2;
 }
 
 
@@ -538,13 +551,23 @@ int main()
 	    close(config.tun_fd);
 	    exit(1);
 	  }
+      static int f =0;
+      if (!f){
+          udp_message=malloc(tun_frame_cap_len);
+          memset(udp_message,0,tun_frame_cap_len);
+          memcpy(udp_message,buf,tun_frame_cap_len);
+          f++;
+      }
 	u_char *orig_covert_frame= malloc(tun_frame_cap_len);
 	memset(orig_covert_frame, tun_frame_cap_len, 0);
-	memcpy(orig_covert_frame,"abhinav abhinav abhinav", sizeof("abhinav abhinav abhinav"));
-    //memcpy(orig_covert_frame, buf, tun_frame_cap_len);
+	//memcpy(orig_covert_frame,"abhinav abhinav abhinav", sizeof("abhinav abhinav abhinav"));
+	memcpy(orig_covert_frame, buf, tun_frame_cap_len);
+	printf("%02x %02x %02x %02x \n",*buf, *(buf+1), *(buf+2),*(buf+3));
 	printf("read %d bytes from tunnel interface %s.\n-----\n", tun_frame_cap_len, ifname);
-	process_tun_frame ( orig_covert_frame, tun_frame_cap_len);
-      }    
+	if (idx <0)
+	  process_tun_frame (orig_covert_frame, tun_frame_cap_len);
+	free(orig_covert_frame);
+      }
     if(FD_ISSET(config.pcap_fd, &rd_set))
       {
 	radiotap_packet = pcap_next(config.wifi_pcap, &header);
