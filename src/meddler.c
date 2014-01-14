@@ -12,8 +12,9 @@
 #include <net/if.h>
 #include <errno.h>
 
-#include "include/ieee802_11_radio.h"
-#include "include/header.h"
+#include "ieee802_11_radio.h"
+#include "header.h"
+#include "link_list.h"
 #include <pcap.h>
 
 #define PACKET_SIZE 1515
