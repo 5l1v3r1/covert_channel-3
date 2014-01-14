@@ -1,4 +1,10 @@
 covert_channel
-==============
-This is a userland code for creating a  covert channel in wireless broadcast medium.
-Part of code for TUN interface is taken from the Internet. 
+
+
+This project is about doing message transfer using intentionally corrupted frames in the wireless
+channel. The repo currently has the userland code for creating a covert channel in wireless broadcast medium.
+
+
+For build :
+Create bin and obj folders to create the final binary and the intermediate object files
+
