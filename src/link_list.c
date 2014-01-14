@@ -120,4 +120,5 @@ static int test_suit()
   printf("the stuff that we got: %s %d\n",d2,l2);
   printf("@@\n");
   print_list();
+  return 0;
 }

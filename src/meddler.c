@@ -303,7 +303,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
 {
   printf("message_injection() %d\n",idx);
   if (idx<0){
-    return; 
+    return -1; 
   }
   struct ip *ip;
   struct udp_hdr *udp;
@@ -335,7 +335,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     IP_header_length = ip->ip_hl * 4;
     if (ip->ip_p != IPPROTO_TCP)
       { /*Has to be a TCP connection*/
-	return;
+	return -1;
       }
     packet += IP_header_length;
     capture_len -= IP_header_length;
@@ -350,7 +350,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     capture_len -= tcp_options;
     ssl_h = (struct ssl_hdr *)packet;
     if (ssl_h->ssl_content_type != 0x17)
-      return ; /*there should be content in the traffic*/
+      return -1; /*there should be content in the traffic*/
 
     printf("ssl v= %02x %02x%02x \n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1), 
 	   *((u_int8_t*)(ssl_h)+2)  );
@@ -432,7 +432,7 @@ int packet_parse(const unsigned char *packet, struct timeval ts,unsigned int cap
   present = pletohl(&hdr->it_present);
   if (capture_len <1400)
     { /*messages are contained in large frames only*/
-      return;
+      return -1;
     }
   if (radiotap_len ==14)
     {
@@ -455,7 +455,7 @@ int process_tun_frame(u_char* orig_covert_frame, int tun_frame_cap_len)
   if (tun_frame_cap_len < ip->ip_hl*4 )
     { /* didn't capture the full IP header including options */
       printf("IP header with options\n");
-      return;
+      return -1;
     }
   //printf("ip offset is offset=%u dont_frag=%u more_frag=%u\n", offset, dont_frag, more_frag);
   //printf("ip morefrags=%u dont_frag=%u frag_offset=%u\n", p->more_frags, p->dont_frag, p->frag_offset);
