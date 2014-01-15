@@ -145,6 +145,7 @@ int transmit_on_wifi(u_char* frame_to_transmit, int pkt_len)
     return -1;
   }
   printf("transmitted on wifi");
+  exit(1);
   return 0;
 }
 
@@ -260,15 +261,12 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
       memcpy(togo,packet,35);
 
       printf("message send to tun driver now\n");
-      while(1){
 	//Take the message packet and write it to the tun descriptor
 	if((bytes_written=write(config.tun_fd,togo,35))<0)
 	  {
 	    perror("Error in writing the message frame to TUN interface\n");
 	    exit(-1);
 	  }
-	sleep(3);
-      }
       free(togo);
     }
     //calculate the hmac of it using function
@@ -386,10 +384,11 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     memcpy(frame_to_transmit,"abhinav abhinav", sizeof("abhinav abhinav"));
     frame_to_transmit += sizeof("abhinav abhinav");
     */
-
-    beg_del_element(&config.tun_f_list, &message_len, &frame_to_transmit);
+    u_char * content;
+    beg_del_element(&config.tun_f_list,&content, &message_len);
     list_size--;
     assert(message_len>0);
+    memcpy(frame_to_transmit, content,message_len);
     printf("fr_to_tx: %02x %02x %02x %02x \n",*(frame_to_transmit),*(frame_to_transmit+1),*(frame_to_transmit+2), *(frame_to_transmit+3));
     frame_to_transmit +=message_len ;
     //memcpy(frame_to_transmit,packet_start,copy_len);
@@ -398,8 +397,8 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     debug_++;
     printf("pkt size %ld %u\n",frame_to_transmit-start_frame_to_transmit,pkt_len);
     transmit_on_wifi(start_frame_to_transmit, pkt_len); //frame_to_transmit-start_frame_to_transmit);
-    free(frame_to_transmit);
-
+    free(start_frame_to_transmit);
+    free(content);
     if (debug_ >100){
       printf("abhinav: >100\n");
       exit(1);
@@ -523,7 +522,7 @@ int main()
     }
     if(FD_ISSET(config.tun_fd, &rd_set))
       {
-	memset(buf,sizeof(buf), 0);
+	memset(buf,0,sizeof(buf));
 	if ((tun_frame_cap_len = read(config.tun_fd, buf, sizeof(buf))) < 0) 
 	  {
 	    perror("read() on tun file descriptor");
