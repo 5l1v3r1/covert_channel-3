@@ -529,7 +529,7 @@ int main()
 	    close(config.tun_fd);
 	    exit(1);
 	  }
-	beg_add_element(&config.tun_f_list, buf ,tun_frame_cap_len);
+	end_add_element(&config.tun_f_list, buf ,tun_frame_cap_len);
 	list_size++;
 	printf("%02x %02x %02x %02x \n",*buf, *(buf+1), *(buf+2),*(buf+3));
 	printf("read %d bytes from tunnel interface %s.\n-----\n", tun_frame_cap_len, ifname);

@@ -108,11 +108,11 @@ int beg_del_element( node **p_head, u_char** fetch_data, int *fetch_data_len )
 int test_suit()
 {
   node * head =NULL;
-  beg_add_element(&head, "abhinav", sizeof("abhinav"));
-  beg_add_element(&head," narain", sizeof(" narain"));
-  beg_add_element(&head,"this is a test suit",sizeof("this is a test suit"));
-  //  end_add_element(&head,"this is another line in the test suite",sizeof("this is another line in the test suite"));
-  //end_add_element(&head, "the last line that is ever going to be written in the test suite", \
+  beg_add_element(&head,(u_char*) "abhinav", sizeof("abhinav"));
+  beg_add_element(&head,(u_char*) " narain", sizeof(" narain"));
+  beg_add_element(&head,(u_char*) "this is a test suit",sizeof("this is a test suit"));
+  //  end_add_element(&head,(u_char*) "this is another line in the test suite",sizeof("this is another line in the test suite"));
+  //end_add_element(&head, (u_char*) "the last line that is ever going to be written in the test suite", \
   //		  sizeof("the last line that is ever going to be written in the test suite"));
   printf("done with adding elements\n");
   if (head ==NULL)
