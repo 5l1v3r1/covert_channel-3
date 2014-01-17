@@ -215,8 +215,11 @@ int main(int argc, char *argv[])
   // Send loop, send for every 2 second for 100 count
   printf("Trying...\n");
   printf("Using raw socket and UDP protocol\n");
+  u_char* text;
+  static int l=0;
   while(1)
   {
+    printf("loop=%d\n",l++);
     packet_len=recvfrom(sd,buffer,1000, MSG_TRUNC,(struct sockaddr *)&from, &fromlen);
     if (packet_len ==-1)
     {
@@ -233,12 +236,24 @@ int main(int argc, char *argv[])
     {
         printf("UDP packet\n");
     }
-    struct udpheader *tu= (struct udpheader *)(buffer+20);
-    printf("after ip src_port =%u\n", ntohs(tu-> udph_srcport));
-    printf("after ip dest_port = %u\n",ntohs(tu->udph_destport));
-    u_char* text=(u_char*)(buffer+20+8);
-    printf("text is %s\n",text);
-
+    int ip_offset = (ip->ip_off & 0x1fff) * 8;
+    
+    printf("flag= %x\n",(ip->ip_off & 0xe000));
+   // IP_DF 0x4000            /* dont fragment flag */
+   // IP_MF 0x2000            /* more fragments flag */
+    if (ip_offset ==0 )
+    { //implies a udp header is present
+    struct udpheader *tu= (struct udpheader *)(buffer+sizeof(struct ip));
+    printf("after src_port =%u\n", ntohs(tu-> udph_srcport));
+    printf("after dest_port = %u\n",ntohs(tu->udph_destport));
+    text=(u_char*)(buffer+sizeof(struct ip)+sizeof(struct udpheader));
+    printf("text1 is: %s\n",text);
+    }
+    else
+    {
+    text =(u_char*)(buffer+sizeof(struct ip));
+    printf("text2 is: %s\n",text);
+    }
   }
   close(sd);
   return 0;
