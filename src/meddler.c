@@ -223,12 +223,12 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
     packet += tcp_options;
     capture_len -= tcp_options;
     ssl_h = (struct ssl_hdr *)packet;
+    printf("message received bef ssl v= %02x %02x%02x\n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1),  *((u_int8_t*)(ssl_h)+2) );
     if (ssl_h->ssl_content_type != 0x17)
     {
       return -1; /*there should be content in the traffic*/
     }
-    printf("message received ssl v= %02x %02x%02x\n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1), 
-	   *((u_int8_t*)(ssl_h)+2) );
+    printf("message received ssl v= %02x %02x%02x\n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1),  *((u_int8_t*)(ssl_h)+2) );
 
     packet += sizeof(struct ssl_hdr);
     capture_len -= sizeof(struct ssl_hdr);
@@ -248,18 +248,18 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
     ch=malloc(7);
     memset(ch,0,7);
     memcpy(ch,packet,7);
-    if(!memcmp(ch,"abhinav",7))
+    if(!memcmp(ch,"Abhinav",7))
       {
         printf("ch abhinav got shit!");
-        exit(1);
+        //exit(1);
       }
     if(*packet==0x45){
       printf("got ip packet\n");
-
       u_char * togo=malloc(35);
       memset(togo,0,35);
       memcpy(togo,packet,35);
 
+    while(1){
       printf("message send to tun driver now\n");
 	//Take the message packet and write it to the tun descriptor
 	if((bytes_written=write(config.tun_fd,togo,35))<0)
@@ -267,6 +267,7 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
 	    perror("Error in writing the message frame to TUN interface\n");
 	    exit(-1);
 	  }
+    }
       free(togo);
     }
     //calculate the hmac of it using function
@@ -423,12 +424,13 @@ int packet_parse(const unsigned char *packet, struct timeval ts,unsigned int cap
     }
   if (radiotap_len ==14)
     {
-      printf("caplen->%d\n",capture_len);
-      message_injection(packet, radiotap_len, capture_len); 
+     // printf("caplen->%d\n",capture_len);
+     // message_injection(packet, radiotap_len, capture_len); 
     }
   else 
     { /*need frames that are sent out through device */
-     // message_reception(packet, radiotap_len, capture_len); //to be enabled at receiver side
+      printf("caplen->%d\n",capture_len);
+      message_reception(packet, radiotap_len, capture_len); //to be enabled at receiver side
     }
     return 0;
 }
