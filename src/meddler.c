@@ -367,9 +367,15 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     int len_frame_to_transmit = 0;
     int copy_len= radiotap_len+ mac_hdr_len+ sizeof(struct ip)+ sizeof(struct llc_hdr)+8+ \
       sizeof(struct tcp_hdr)+TCP_OPTIONS+sizeof(struct ssl_hdr)+message_offset;
-    frame_to_transmit=malloc(pkt_len);
+    frame_to_transmit=malloc(pkt_len+4);
     memset(frame_to_transmit,'\0',sizeof(frame_to_transmit));
     u_char* start_frame_to_transmit= frame_to_transmit;
+    u_char * content;
+    beg_del_element(&config.tun_f_list,&content, &message_len);
+    list_size--;
+    assert(message_len>0);
+    memcpy(frame_to_transmit,(u_char*)&message_len,4); 
+    frame_to_transmit +=4;
     memcpy(frame_to_transmit, u8aRadiotapHeader,sizeof (u8aRadiotapHeader));
     frame_to_transmit += sizeof (u8aRadiotapHeader);
 
@@ -385,10 +391,6 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     memcpy(frame_to_transmit,"abhinav abhinav", sizeof("abhinav abhinav"));
     frame_to_transmit += sizeof("abhinav abhinav");
     */
-    u_char * content;
-    beg_del_element(&config.tun_f_list,&content, &message_len);
-    list_size--;
-    assert(message_len>0);
     memcpy(frame_to_transmit, content,message_len);
     printf("fr_to_tx: %02x %02x %02x %02x \n",*(frame_to_transmit),*(frame_to_transmit+1),*(frame_to_transmit+2), *(frame_to_transmit+3));
     frame_to_transmit +=message_len ;
@@ -531,7 +533,7 @@ int main()
 	    close(config.tun_fd);
 	    exit(1);
 	  }
-	beg_add_element(&config.tun_f_list, buf ,tun_frame_cap_len);
+	end_add_element(&config.tun_f_list, buf ,tun_frame_cap_len);
 	list_size++;
 	printf("%02x %02x %02x %02x \n",*buf, *(buf+1), *(buf+2),*(buf+3));
 	printf("read %d bytes from tunnel interface %s.\n-----\n", tun_frame_cap_len, ifname);
