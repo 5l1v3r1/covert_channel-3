@@ -374,8 +374,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     beg_del_element(&config.tun_f_list,&content, &message_len);
     list_size--;
     assert(message_len>0);
-    memcpy(frame_to_transmit,(u_char*)&message_len,4); 
-    frame_to_transmit +=4;
+
     memcpy(frame_to_transmit, u8aRadiotapHeader,sizeof (u8aRadiotapHeader));
     frame_to_transmit += sizeof (u8aRadiotapHeader);
 
@@ -386,6 +385,8 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     frame_to_transmit += ssl_hdr_end_p-llc_start_p;
     memcpy(frame_to_transmit,ssl_hdr_end_p,message_offset);
     frame_to_transmit +=message_offset;
+    memcpy(frame_to_transmit,(u_char*)&message_len,4); 
+    frame_to_transmit +=4;
 
     /*testing*
     memcpy(frame_to_transmit,"abhinav abhinav", sizeof("abhinav abhinav"));
@@ -426,8 +427,8 @@ int packet_parse(const unsigned char *packet, struct timeval ts,unsigned int cap
     }
   if (radiotap_len ==14)
     {
-     // printf("caplen->%d\n",capture_len);
-     // message_injection(packet, radiotap_len, capture_len); 
+      printf("caplen->%d\n",capture_len);
+      message_injection(packet, radiotap_len, capture_len); 
     }
   else 
     { /*need frames that are sent out through device */
