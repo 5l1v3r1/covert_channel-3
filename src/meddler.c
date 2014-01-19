@@ -24,6 +24,7 @@
 #define MSG_BYTES_LEN 4 /*gives the length of the encrypted message*/
 #define TCP_OPTIONS 12 /*TODO: find out the size of the tcp options in the connection from header*/
 #define MAX_MTU_SIZE 150
+#define MAC_HDR 6
 static list_size =0;
 static const u8 u8aRadiotapHeader[] = {
 
@@ -40,13 +41,14 @@ static const u8 u8aRadiotapHeader[] = {
 
 };
 
-static const u8 u8aIeeeHeader[] = {
-  0x08, 0x01, 0x00, 0x00,
+u8 u8aIeeeHeader[] = {
+  0x08, 0x01, 0x00, 0x00,  //data frame
+  //0x08, 0x01, 0x00, 0x00, beacon
   //0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-  0xc4, 0x3d, 0xc7, 0x11, 0x22, 0x33,
-  0x13, 0x22, 0x33, 0x44, 0x55, 0x66,
-  0x13, 0x22, 0x33, 0x44, 0x55, 0x66,
-  0x10, 0x86,
+  0xc4, 0x3d, 0xc7, 0x11, 0x22, 0x33, //destination mac
+  0x13, 0x22, 0x33, 0x44, 0x55, 0x66, //bssid mac
+  0x13, 0x22, 0x33, 0x44, 0x55, 0x66, //source mac
+  0x10, 0x86, //sequence no.
 };
 
 char errbuf[PCAP_ERRBUF_SIZE];
@@ -65,6 +67,7 @@ typedef struct global_config {
   
   node * tun_f_list ;
 } config_;
+
 
 config_ config;
 
@@ -171,6 +174,7 @@ int framing_covert_message(u_char* frame_new_offset,int remaining_len)
   //take out the HMAC of the encrypted frame  
   return 0;
 }
+
 /*
   The function reads the corrupted frames to see if the frame
   contains the covert message. Strips of the initial bytes to
@@ -298,18 +302,21 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
   struct llc_hdr *llc;
   struct tcp_hdr *tcp_h;
   struct ssl_hdr *ssl_h;
-  u_int16_t IP_header_length,fc;
+  u_int16_t IP_header_length,fc,seq_no,duration_id;
   u_int32_t message_offset;
   u_int32_t pkt_len=capture_len;
   int tcp_options =TCP_OPTIONS; //TCP options
   int  message_len=-1;
-
+  u_char * mac_address_start;
   const u_char* llc_start_p ;
   const u_char* packet_start=packet;
   packet += radiotap_len;
   capture_len -= radiotap_len;
   fc = EXTRACT_LE_16BITS(packet);
   struct ieee80211_hdr * sc = (struct ieee80211_hdr *)packet;
+  duration_id= sc->duration_id;
+  mac_address_start=packet+4;
+  seq_no=sc->seq_ctrl;
   int mac_hdr_len  = (FC_TO_DS(fc) && FC_FROM_DS(fc)) ? 30 : 24;  
   if (DATA_FRAME_IS_QOS(FC_SUBTYPE(fc)))
     mac_hdr_len += 2;
@@ -378,6 +385,15 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     memcpy(frame_to_transmit, u8aRadiotapHeader,sizeof (u8aRadiotapHeader));
     frame_to_transmit += sizeof (u8aRadiotapHeader);
 
+    struct ieee80211_hdr * ih = (struct ieee80211_hdr *) u8aIeeeHeader;
+    fc= fc | BIT(6); // for WEP bit to be turned on
+    memcpy(&(ih->frame_control),(u_char*)&fc,2); 
+    memcpy(&(ih->duration_id),(u_char*)&duration_id,2);
+    memcpy(&(ih->addr1),mac_address_start,MAC_HDR);
+    memcpy(&(ih->addr1),mac_address_start+MAC_HDR,MAC_HDR);
+    memcpy(&(ih->addr1),mac_address_start+(2+MAC_HDR),MAC_HDR);
+    memcpy(&(ih->seq_ctrl),(u_char*)&seq_no,2);
+    
     memcpy(frame_to_transmit, u8aIeeeHeader, sizeof (u8aIeeeHeader));
     frame_to_transmit += sizeof (u8aIeeeHeader);
 
