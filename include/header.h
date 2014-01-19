@@ -36,6 +36,8 @@
 #define FC_TYPE(fc)             (((fc) >> 2) & 0x3)
 #define FC_SUBTYPE(fc)          (((fc) >> 4) & 0xF)
 
+#define BIT(x) (1 << (x))
+
 #define IEEE80211_FTYPE_DATA    0x0008
 #include <sys/types.h>
 typedef u_int8_t u8;
