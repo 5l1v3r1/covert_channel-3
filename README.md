@@ -5,8 +5,7 @@ This project is about doing message transfer using intentionally corrupted frame
 channel. The repo currently has the userland code for creating a covert channel in wireless broadcast medium.
 
 TODO: 
-Implement the compression and encryption using symmetric keys.
-
+Merge the code for enc/dec/compress/decompress and stuff in the main branch
 For build :
 Create bin and obj folders to create the final binary and the intermediate object files
 
