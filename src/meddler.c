@@ -58,18 +58,20 @@ u8 u8aIeeeHeader[] = {
 };
 
 char errbuf[PCAP_ERRBUF_SIZE];
-
+#define SALT_SIZE 2
 typedef struct global_config {
   int tun_fd;
   int pcap_fd;
   pcap_t* wifi_pcap;
-  char * key;
+  u_char * shared_key;
+  int shared_key_len;
+  u_int32_t salt[SALT_SIZE] ;
 
-  char * sender_public_key;
-  char * sender_private_key;
+  u_char * sender_public_key;
+  u_char * sender_private_key;
   
-  char * receiver_public_key;
-  char * receiver_private_key;
+  u_char * receiver_public_key;
+  u_char * receiver_private_key;
   
   node * tun_f_list ;
 } config_;
@@ -112,15 +114,9 @@ int tun_alloc(char *dev)
     return fd;
 }
 
-pcap_t * pcap_radiotap_handler(char * file_d){
+pcap_t * pcap_radiotap_handler(char * monitor_interface){
   pcap_t *pcap;
-  if (0)
-    pcap = pcap_open_offline(file_d, errbuf);
-  else
-    {
-      file_d="phy6";
-      pcap=pcap_open_live(file_d, 1500 , 1,20, errbuf);//check the timeout value 
-    }
+  pcap=pcap_open_live(monitor_interface, 1500 , 1,20, errbuf);//check the timeout value 
   if( pcap == NULL)
     {
       fprintf(stderr, "error reading pcap file: %s\n", errbuf);
@@ -508,10 +504,17 @@ int main()
   int tun_frame_cap_len,rad_ret;
   const u_char * radiotap_packet;
   struct pcap_pkthdr header;
-  char *mon_interface ="realgmail.pcap";
-  config.key = "20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
+
+  EVP_CIPHER_CTX en, de;
+
+  config.shared_key = "20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
+  u_char k[]="20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
+  config.shared_key_len=sizeof(k);
+  memcpy(config.salt, (u_int32_t[]) {12345, 54321}, sizeof config.salt);
+
   config.tun_f_list =NULL;
 
+  char * mon_interface="phy6";
   config.wifi_pcap= pcap_radiotap_handler(mon_interface);
   if (pcap_setnonblock(config.wifi_pcap, 1, errbuf) == -1) {
     fprintf(stderr, "pcap_setnonblock failed: %s\n", errbuf);
@@ -524,6 +527,12 @@ int main()
   if ((config.tun_fd= tun_alloc(ifname)) < 0) {
     fprintf(stderr, "tunnel interface allocation failed\n");
     exit(-1);
+  }
+
+
+  if (aes_init(config.shared_key, config.shared_key_len, (unsigned char *)&config.salt, &en, &de)) {
+    printf("Couldn't initialize AES cipher\n");
+    return -1;
   }
   printf("allocted tunnel interface %s\n", ifname);
   

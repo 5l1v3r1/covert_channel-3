@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS+=-c -g -Wall -O3 -DOSX  -Wundef -Wstrict-prototypes -Wuninitialized -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration
 INC  += -I$(INCDIR)
-LDFLAGS+=  -lpcap  -lm 
+LDFLAGS+=  -lpcap  -lm  -lcrypto
 
 TARGET =injector
 SRCDIR = src

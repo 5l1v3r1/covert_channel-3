@@ -1,10 +1,13 @@
-#include <stdio.h>
+D1;3202;0c#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 struct node{
   u_char* data;
   int data_len;
+  u_char* cipher_data;
+  int cipher_data_len;
+  u_char * hmac_zip_data;
   struct node *next;
 };
 
