@@ -1,7 +1,5 @@
 #include <stdio.h>
-#include <string.h>
 #include <fcntl.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
@@ -13,10 +11,18 @@
 #include <errno.h>
 #include <pcap.h>
 #include <assert.h>
+#include <zlib.h>
+#ifdef STDC
+#  include <string.h>
+#  include <stdlib.h>
+#endif
+#include <openssl/evp.h>
+#include <openssl/aes.h>
+#include <openssl/hmac.h>
+#include "cryptozis.h"
 #include "ieee802_11_radio.h"
 #include "header.h"
 #include "link_list.h"
-
 
 #define PACKET_SIZE 1515
 #define CRC_BYTES_LEN 4
