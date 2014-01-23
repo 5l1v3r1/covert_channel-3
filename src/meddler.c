@@ -16,21 +16,12 @@
 #  include <string.h>
 #  include <stdlib.h>
 #endif
-#include <openssl/evp.h>
-#include <openssl/aes.h>
-#include <openssl/hmac.h>
-#include "cryptozis.h"
 #include "ieee802_11_radio.h"
 #include "header.h"
+#include "config.h"
 #include "link_list.h"
+#include "cryptozis.h"
 
-#define PACKET_SIZE 1515
-#define CRC_BYTES_LEN 4
-#define H_MAC_BYTES_LEN 4 /*hmac of the message to be calculated and store. message will be stored in front of HMAC*/
-#define MSG_BYTES_LEN 4 /*gives the length of the encrypted message*/
-#define TCP_OPTIONS 12 /*TODO: find out the size of the tcp options in the connection from header*/
-#define MAX_MTU_SIZE 150
-#define MAC_HDR 6
 static list_size =0;
 static const u8 u8aRadiotapHeader[] = {
 
@@ -58,25 +49,6 @@ u8 u8aIeeeHeader[] = {
 };
 
 char errbuf[PCAP_ERRBUF_SIZE];
-#define SALT_SIZE 2
-typedef struct global_config {
-  int tun_fd;
-  int pcap_fd;
-  pcap_t* wifi_pcap;
-  u_char * shared_key;
-  int shared_key_len;
-  u_int32_t salt[SALT_SIZE] ;
-
-  u_char * sender_public_key;
-  u_char * sender_private_key;
-  
-  u_char * receiver_public_key;
-  u_char * receiver_private_key;
-  
-  node * tun_f_list ;
-} config_;
-
-
 config_ config;
 
 static int debug_;
@@ -86,9 +58,9 @@ int message_injection(const unsigned char * packet, u_int16_t radiotap_len, u_in
 int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int32_t capture_len);
 int framing_covert_message(u_char*,int );
 int transmit_on_wifi(u_char *,int);
-int tun_alloc(char *);
+int tun_allocation(char *);
 
-int tun_alloc(char *dev)
+int tun_allocation(char *dev)
 {
     struct ifreq ifr;
     int fd, err;
@@ -505,7 +477,7 @@ int main()
   const u_char * radiotap_packet;
   struct pcap_pkthdr header;
 
-  EVP_CIPHER_CTX en, de;
+
 
   config.shared_key = "20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
   u_char k[]="20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
@@ -524,13 +496,12 @@ int main()
   config.pcap_fd = pcap_get_selectable_fd(config.wifi_pcap);
 
   strcpy(ifname, "tun2");
-  if ((config.tun_fd= tun_alloc(ifname)) < 0) {
+  if ((config.tun_fd= tun_allocation(ifname)) < 0) {
     fprintf(stderr, "tunnel interface allocation failed\n");
     exit(-1);
   }
 
-
-  if (aes_init(config.shared_key, config.shared_key_len, (unsigned char *)&config.salt, &en, &de)) {
+  if (aes_init(config.shared_key, config.shared_key_len, (unsigned char *)&config.salt, &config.en, &config.de)) {
     printf("Couldn't initialize AES cipher\n");
     return -1;
   }

@@ -2,19 +2,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-struct node{
-  u_char* data;
-  int data_len;
-  u_char* cipher_data;
-  int cipher_data_len;
-  u_char * hmac_zip_data;
-  struct node *next;
-};
-
-typedef struct node node;
+#include "config.h"
 static list_size=0;
 
-int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size,)
+int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
 {
   struct node * element= (struct node *) malloc (sizeof(struct node));
   memset(element, 0, sizeof(element));
