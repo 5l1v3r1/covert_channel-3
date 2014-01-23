@@ -1,4 +1,4 @@
-D1;3202;0c#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -14,18 +14,18 @@ struct node{
 typedef struct node node;
 static list_size=0;
 
-int beg_add_element(node ** p_head ,u_char *blob,int blob_size)
+int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size,)
 {
   struct node * element= (struct node *) malloc (sizeof(struct node));
   memset(element, 0, sizeof(element));
-  element->data = malloc(blob_size);
+  element->data = malloc(data_blob_size);
   
   if (element->data ==NULL){
     printf("malloc failed in beg_add_element()\n");
     return -1;
   }
-  element->data_len=blob_size;
-  memcpy(element->data,blob,blob_size);
+  element->data_len=data_blob_size;
+  memcpy(element->data,data_blob,data_blob_size);
   if (*p_head ==NULL)
     {
       *p_head =element;
@@ -42,19 +42,19 @@ int beg_add_element(node ** p_head ,u_char *blob,int blob_size)
 Adds the packet buffer and the packet buffer length to the linked 
 list.
 */
-int end_add_element(node **p_head , u_char * blob, int blob_size)
+int end_add_element(node **p_head , u_char * data_blob, int data_blob_size)
 {  
   node * temp;
 
   node * element= (node *) malloc (sizeof(struct node));
   memset(element, 0, sizeof(element));
-  element->data = malloc(blob_size);
+  element->data = malloc(data_blob_size);
   if (element->data ==NULL){
     printf("malloc failed\n");
     return -1;
   }
-  element->data_len = blob_size;
-  memcpy(element->data,blob,blob_size);
+  element->data_len = data_blob_size;
+  memcpy(element->data,data_blob,data_blob_size);
   temp = *p_head ;
   if (*p_head ==NULL)
     {
