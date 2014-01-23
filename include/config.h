@@ -18,6 +18,8 @@ struct node{
   int data_len;
   u_char* cipher_data;
   int cipher_data_len;
+  u_char* compressed_data;
+  ulong compressed_data_len;
   u_char * hmac_zip_data;
   struct node *next;
 };
@@ -29,6 +31,7 @@ typedef struct global_config {
   pcap_t* wifi_pcap;
   u_char* shared_key;
   int shared_key_len;
+
   u_int32_t salt[SALT_SIZE] ;
 
   u_char * sender_public_key;

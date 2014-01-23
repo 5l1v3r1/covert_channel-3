@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <zlib.h>
 #include "config.h"
-static list_size=0;
+#include "cryptozis.h"
 
+static int list_size=0;
 int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
 {
   struct node * element= (struct node *) malloc (sizeof(struct node));
@@ -17,6 +19,11 @@ int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
   }
   element->data_len=data_blob_size;
   memcpy(element->data,data_blob,data_blob_size);
+  element->cipher_data_len = data_blob_size;
+  enrypt_digest(&config.en, element->data,&(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
+  element->compressed_data_len = compressBound(element->cipher_data_len);
+  compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
+
   if (*p_head ==NULL)
     {
       *p_head =element;
@@ -46,6 +53,11 @@ int end_add_element(node **p_head , u_char * data_blob, int data_blob_size)
   }
   element->data_len = data_blob_size;
   memcpy(element->data,data_blob,data_blob_size);
+  element->cipher_data_len = data_blob_size;
+  enrypt_digest(&config.en, element->data, &(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
+  element->compressed_data_len = compressBound(element->cipher_data_len);
+  compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
+
   temp = *p_head ;
   if (*p_head ==NULL)
     {
@@ -94,8 +106,9 @@ int beg_del_element( node **p_head, u_char** fetch_data, int *fetch_data_len )
   *p_head=fetch_node->next;
   *fetch_data = malloc(fetch_node->data_len);
   memset(*fetch_data,0, fetch_node->data_len);
-  memcpy(*fetch_data,fetch_node->data,fetch_node->data_len);
-  *fetch_data_len =fetch_node->data_len;
+  memcpy(*fetch_data,fetch_node->compressed_data,fetch_node->compressed_data_len);
+  *fetch_data_len =fetch_node->compressed_data_len;
+  free(fetch_node);
   list_size--;
 }
 

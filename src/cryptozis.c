@@ -81,13 +81,13 @@ int enrypt_digest(EVP_CIPHER_CTX *en,
 		  u_char** sha_frame,
 		  u_char **encr_frame,
 		  int*encr_frame_len,
-		  u_char key[])
+		  u_char* key,int key_len)
 {
   
   *encr_frame = aes_encrypt(en,frame, encr_frame_len);
   if (*encr_frame ==NULL)
     return -1;
-  *sha_frame = HMAC(EVP_sha256(), key, sizeof(key)-1, frame, (const int) (*encr_frame_len), NULL, NULL);
+  *sha_frame = HMAC(EVP_sha256(), key, key_len, frame, (const int) (*encr_frame_len), NULL, NULL);
   return 0;
 }
 
@@ -96,12 +96,12 @@ int decrypt_digest(EVP_CIPHER_CTX *de,
 		   u_char** sha_frame,
 		   u_char **decr_frame,
 		   int* decr_frame_len,
-		   u_char key[])
+		   u_char *key,int key_len)
 {
   *decr_frame = aes_decrypt(de, pUncomp_cipher_frame, decr_frame_len);
   if (*decr_frame ==NULL)
     return -1;
-  *sha_frame = HMAC(EVP_sha256(), key, sizeof(key)-1, *decr_frame, (const int)*decr_frame_len, NULL, NULL);
+  *sha_frame = HMAC(EVP_sha256(), key, key_len, *decr_frame, (const int)*decr_frame_len, NULL, NULL);
   return 0;
 }
 int compress_cipher_frame(u_char **pCmp_cipher_frame,
@@ -186,12 +186,12 @@ int main(int argc, char **argv)
        we end up with a legal C string 
   */
   cipher_frame_len = orig_frame_len = sizeof(frame);
-  enrypt_digest(&en,frame,&sha_orig_frame, &cipher_frame,&cipher_frame_len,key_data);
+  enrypt_digest(&en,frame,&sha_orig_frame, &cipher_frame,&cipher_frame_len,key_data,key_data_len);
   compressed_frame_len = compressBound(cipher_frame_len);
   compress_cipher_frame(&pCmp_cipher_frame, &compressed_frame_len, cipher_frame, cipher_frame_len);
   uncompress_cipher_frame(&pUncomp_cipher_frame, pCmp_cipher_frame, &uncompressed_frame_len, compressed_frame_len, cipher_frame_len );
   decrypted_frame_len=cipher_frame_len;
-  decrypt_digest(&de,pUncomp_cipher_frame, &sha_decr_frame, &decrypted_frame,&decrypted_frame_len,key_data);
+  decrypt_digest(&de,pUncomp_cipher_frame, &sha_decr_frame, &decrypted_frame,&decrypted_frame_len,key_data,key_data_len);
   if ((uncompressed_frame_len != cipher_frame_len) || (memcmp(pUncomp_cipher_frame, cipher_frame, (size_t)cipher_frame_len)))
     {
       printf("Decompression failed!\n");
