@@ -78,7 +78,6 @@ static u_char *aes_decrypt(EVP_CIPHER_CTX *e, unsigned char *ciphertext, int *le
 
 int enrypt_digest(EVP_CIPHER_CTX *en,
 		  u_char *frame,
-		  u_int32_t frame_len,
 		  u_char** sha_frame,
 		  u_char **encr_frame,
 		  int*encr_frame_len,
@@ -106,9 +105,9 @@ int decrypt_digest(EVP_CIPHER_CTX *de,
   return 0;
 }
 int compress_cipher_frame(u_char **pCmp_cipher_frame,
-		      ulong *compressed_frame_len,	  
-		      u_char * cipher_frame,
-		      int cipher_frame_len)
+			  ulong *compressed_frame_len,
+			  u_char * cipher_frame,
+			  int cipher_frame_len)
 {
   int cmp_status;
   *pCmp_cipher_frame = (u_int8_t *)malloc((size_t)*compressed_frame_len);
@@ -187,7 +186,7 @@ int main(int argc, char **argv)
        we end up with a legal C string 
   */
   cipher_frame_len = orig_frame_len = sizeof(frame);
-  enrypt_digest(&en,frame,orig_frame_len,&sha_orig_frame, &cipher_frame,&cipher_frame_len,key_data);
+  enrypt_digest(&en,frame,&sha_orig_frame, &cipher_frame,&cipher_frame_len,key_data);
   compressed_frame_len = compressBound(cipher_frame_len);
   compress_cipher_frame(&pCmp_cipher_frame, &compressed_frame_len, cipher_frame, cipher_frame_len);
   uncompress_cipher_frame(&pUncomp_cipher_frame, pCmp_cipher_frame, &uncompressed_frame_len, compressed_frame_len, cipher_frame_len );
