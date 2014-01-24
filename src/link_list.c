@@ -104,8 +104,8 @@ int beg_del_element( node **p_head, u_char** fetch_data, int *fetch_data_len )
       return -1; //empty list
     }
   *p_head=fetch_node->next;
-  *fetch_data = malloc(fetch_node->data_len);
-  memset(*fetch_data,0, fetch_node->data_len);
+  *fetch_data = malloc(fetch_node->compressed_data_len);
+  memset(*fetch_data,0, fetch_node->compressed_data_len);
   memcpy(*fetch_data,fetch_node->compressed_data,fetch_node->compressed_data_len);
   *fetch_data_len =fetch_node->compressed_data_len;
   free(fetch_node);
