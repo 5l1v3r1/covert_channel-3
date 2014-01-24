@@ -167,7 +167,7 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
   u_int32_t message_offset;
   u_int32_t pkt_len=capture_len;
   int tcp_options =TCP_OPTIONS; //TCP options
-  int bytes_written =0;
+  int bytes_written=0,covert_message_size =9;
   packet += radiotap_len;
   capture_len -= radiotap_len;
   const u_char* packet_start=packet;
@@ -220,32 +220,27 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
        use the key to decrypt the length of message following it       
      */
     packet +=message_offset;
+    memcpy((u_char*)&covert_message_size,packet,INT_SIZE);
+    packet +=INT_SIZE;
     u_char* hmac;
     printf("%02x %02x %02x %02x %02x %02x \n",*packet,*(packet+1), *(packet+2),*(packet+3), *(packet+4),*(packet+5));
-    u_char* ch;
-    ch=malloc(7);
-    memset(ch,0,7);
-    memcpy(ch,packet,7);
-    if(!memcmp(ch,"Abhinav",7))
-      {
-        printf("ch abhinav got shit!");
-        //exit(1);
-      }
     if(*packet==0x45){
       printf("got ip packet\n");
-      u_char * togo=malloc(35);
-      memset(togo,0,35);
-      memcpy(togo,packet,35);
+      u_char * togo=malloc(covert_message_size);
+      memset(togo,0,covert_message_size);
+      memcpy(togo,packet,covert_message_size);
 
-    while(1){
       printf("message send to tun driver now\n");
 	//Take the message packet and write it to the tun descriptor
-	if((bytes_written=write(config.tun_fd,togo,35))<0)
-	  {
+	if((bytes_written=write(config.tun_fd,togo,covert_message_size))<0)
+	  { 
 	    perror("Error in writing the message frame to TUN interface\n");
 	    exit(-1);
 	  }
-    }
+    else
+      {
+        printf("packet is written to tun driver yay!\n");    
+      } 
       free(togo);
     }
     //calculate the hmac of it using function
