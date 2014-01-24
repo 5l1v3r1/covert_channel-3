@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <net/if.h>
 #include <sys/ioctl.h>
 #include <linux/if_tun.h>
 #include <netinet/ip.h>
@@ -22,7 +21,7 @@
 #include "link_list.h"
 #include "cryptozis.h"
 
-static list_size =0;
+static int list_size =0;
 static const u8 u8aRadiotapHeader[] = {
 
   0x00, 0x00, // <-- radiotap version
@@ -163,16 +162,15 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
   struct llc_hdr *llc;
   struct tcp_hdr *tcp_h;
   struct ssl_hdr *ssl_h;
-  u_int16_t IP_header_length,fc;
+  u_int16_t IP_header_length,fc,compressed_covert_mesg_size =0;
   u_int32_t message_offset;
   u_int32_t pkt_len=capture_len;
   int tcp_options =TCP_OPTIONS; //TCP options
-  int bytes_written=0,covert_message_size =9;
+  int bytes_written=0;
   packet += radiotap_len;
   capture_len -= radiotap_len;
   const u_char* packet_start=packet;
   fc = EXTRACT_LE_16BITS(packet);
-  struct ieee80211_hdr * sc = (struct ieee80211_hdr *)packet;
   int mac_hdr_len  = (FC_TO_DS(fc) && FC_FROM_DS(fc)) ? 30 : 24;  
   if (DATA_FRAME_IS_QOS(FC_SUBTYPE(fc)))
     mac_hdr_len += 2;
@@ -220,19 +218,31 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
        use the key to decrypt the length of message following it       
      */
     packet +=message_offset;
-    memcpy((u_char*)&covert_message_size,packet,INT_SIZE);
-    packet +=INT_SIZE;
+    memcpy((u_char*)&compressed_covert_mesg_size,packet,SHORT_SIZE);
+    packet +=SHORT_SIZE;
     u_char* hmac;
     printf("%02x %02x %02x %02x %02x %02x \n",*packet,*(packet+1), *(packet+2),*(packet+3), *(packet+4),*(packet+5));
-    if(*packet==0x45){
-      printf("got ip packet\n");
-      u_char * togo=malloc(covert_message_size);
-      memset(togo,0,covert_message_size);
-      memcpy(togo,packet,covert_message_size);
-
+    hmac= malloc(SHA_SIZE);
+    memset(hmac,0,SHA_SIZE);
+    memcpy(hmac,packet,SHA_SIZE);
+    packet +=SHA_SIZE;
+    u_char* compressed_message;
+    compressed_message = malloc(compressed_covert_mesg_size);
+    memset(compressed_message,0,compressed_covert_mesg_size);
+    memcpy(compressed_message,packet,compressed_covert_mesg_size);
+    ulong uncompressed_frame_len=0;
+    u_char*uncompressed_cipher_frame;
+    u_char*decrypted_tun_frame;
+    u_char* sha_decr_frame;
+    int decrypted_tun_frame_len;
+    uncompress_cipher_frame(&uncompressed_cipher_frame, compressed_message, &uncompressed_frame_len, compressed_covert_mesg_size);
+    decrypt_digest(&config.de, uncompressed_cipher_frame, &sha_decr_frame, &decrypted_tun_frame, &decrypted_tun_frame_len, config.shared_key, config.shared_key_len);
+    if(memcmp(sha_decr_frame,hmac,SHA_SIZE))
+    {
+        printf("SHA of the frame is correct\n");
       printf("message send to tun driver now\n");
 	//Take the message packet and write it to the tun descriptor
-	if((bytes_written=write(config.tun_fd,togo,covert_message_size))<0)
+	if((bytes_written=write(config.tun_fd,decrypted_tun_frame,decrypted_tun_frame_len))<0)
 	  { 
 	    perror("Error in writing the message frame to TUN interface\n");
 	    exit(-1);
@@ -241,21 +251,17 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
       {
         printf("packet is written to tun driver yay!\n");    
       } 
-      free(togo);
     }
-    //calculate the hmac of it using function
-    /*
-    if(!memcmp(calculated_hmac,hmac,sizeof(hmac)))
-      { 
-	//Take the message packet and write it to the tun descriptor
-	if(bytes_written=write(config.tun_fd,message,mesg_size)<0)
-	  {
-	    perror("Error in writing the message frame to TUN interface\n");
-	    exit(-1);
-	  }
-      }
-   */ 
-  }  
+    else
+    {
+        printf("SHA of the frame is INcorrect\n");
+    }
+
+    free(compressed_message);
+    free(sha_decr_frame); 
+    free(decrypted_tun_frame);
+    free(uncompressed_cipher_frame);
+  }
   return 0;
 }
 /*
@@ -271,11 +277,10 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
   struct llc_hdr *llc;
   struct tcp_hdr *tcp_h;
   struct ssl_hdr *ssl_h;
-  u_int16_t IP_header_length,fc,seq_no,duration_id;
+  u_int16_t IP_header_length,fc,seq_no,duration_id,message_len=-1;
   u_int32_t message_offset;
   u_int32_t pkt_len=capture_len;
   int tcp_options =TCP_OPTIONS; //TCP options
-  int  message_len=-1;
   u_char * mac_address_start;
   const u_char* llc_start_p ;
   const u_char* packet_start=packet;
@@ -370,13 +375,14 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     frame_to_transmit += ssl_hdr_end_p-llc_start_p;
     memcpy(frame_to_transmit,ssl_hdr_end_p,message_offset);
     frame_to_transmit +=message_offset;
-    memcpy(frame_to_transmit,(u_char*)&message_len,INT_SIZE); 
-    frame_to_transmit +=INT_SIZE;
+    memcpy(frame_to_transmit,(u_char*)&message_len,SHORT_SIZE); 
+    frame_to_transmit +=SHORT_SIZE;
 
     /*testing*
     memcpy(frame_to_transmit,"abhinav abhinav", sizeof("abhinav abhinav"));
     frame_to_transmit += sizeof("abhinav abhinav");
     */
+
     memcpy(frame_to_transmit, content,message_len);
     printf("fr_to_tx: %02x %02x %02x %02x \n",*(frame_to_transmit),*(frame_to_transmit+1),*(frame_to_transmit+2), *(frame_to_transmit+3));
     frame_to_transmit +=message_len ;
@@ -388,10 +394,6 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     transmit_on_wifi(start_frame_to_transmit, pkt_len); //frame_to_transmit-start_frame_to_transmit);
     free(start_frame_to_transmit);
     free(content);
-    if (debug_ >100){
-      printf("abhinav: >100\n");
-      exit(1);
-    }
   }
   return 0 ;
 }
@@ -474,7 +476,7 @@ int main()
 
 
 
-  config.shared_key = "20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
+  config.shared_key = (u_char*)"20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
   u_char k[]="20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
   config.shared_key_len=sizeof(k);
   memcpy(config.salt, (u_int32_t[]) {12345, 54321}, sizeof config.salt);
