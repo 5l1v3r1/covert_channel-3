@@ -370,8 +370,8 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     frame_to_transmit += ssl_hdr_end_p-llc_start_p;
     memcpy(frame_to_transmit,ssl_hdr_end_p,message_offset);
     frame_to_transmit +=message_offset;
-    memcpy(frame_to_transmit,(u_char*)&message_len,4); 
-    frame_to_transmit +=4;
+    memcpy(frame_to_transmit,(u_char*)&message_len,INT_SIZE); 
+    frame_to_transmit +=INT_SIZE;
 
     /*testing*
     memcpy(frame_to_transmit,"abhinav abhinav", sizeof("abhinav abhinav"));

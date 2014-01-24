@@ -12,6 +12,7 @@
 #define TCP_OPTIONS 12    /*TODO: find out the size of the tcp options in the connection from header*/
 #define MAX_MTU_SIZE 150
 #define MAC_HDR 6
+#define INT_SIZE 4
 
 struct node{
   u_char* data;
