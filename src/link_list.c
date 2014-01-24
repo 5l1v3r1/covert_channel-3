@@ -20,7 +20,7 @@ int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
   element->data_len=data_blob_size;
   memcpy(element->data,data_blob,data_blob_size);
   element->cipher_data_len = data_blob_size;
-  enrypt_digest(&config.en, element->data,&(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
+  encrypt_digest(&config.en, element->data,&(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
   element->compressed_data_len = compressBound(element->cipher_data_len);
   compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
 
@@ -54,7 +54,7 @@ int end_add_element(node **p_head , u_char * data_blob, int data_blob_size)
   element->data_len = data_blob_size;
   memcpy(element->data,data_blob,data_blob_size);
   element->cipher_data_len = data_blob_size;
-  enrypt_digest(&config.en, element->data, &(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
+  encrypt_digest(&config.en, element->data, &(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
   element->compressed_data_len = compressBound(element->cipher_data_len);
   compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
 
@@ -94,7 +94,7 @@ int print_list(node *p)
 /*
   Fetches the packet buffer and the packet len from the linked list 
 */
-int beg_del_element( node **p_head, u_char** fetch_data, int *fetch_data_len )
+int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_len )
 {
   node * fetch_node;
   fetch_node = *p_head ;
@@ -127,7 +127,7 @@ int test_suit()
   print_list(head);
   u_char * d1;
   u_char * d2;
-  int l1,l2;
+  u_int16_t l1,l2;
   beg_del_element(&head, &d1, &l1);
   printf("the stuff that we got: %s %d\n",d1,l1);
   print_list(head );

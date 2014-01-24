@@ -9,13 +9,13 @@ int aes_init(unsigned char *key_data,
 	     EVP_CIPHER_CTX *e_ctx, 
 	     EVP_CIPHER_CTX *d_ctx);
 
-int enrypt_digest(EVP_CIPHER_CTX *en,
-		  u_char *frame,
-		  u_char** sha_frame,
-		  u_char **encr_frame,
-		  int*encr_frame_len,
-		  u_char* key,
-		  int key_len);
+int encrypt_digest(EVP_CIPHER_CTX *en,
+		   u_char *frame,
+		   u_char** sha_frame,
+		   u_char **encr_frame,
+		   int*encr_frame_len,
+		   u_char* key,
+		   int key_len);
 
 int decrypt_digest(EVP_CIPHER_CTX *de,
 		   u_char * pUncomp_cipher_frame, 
@@ -25,11 +25,12 @@ int decrypt_digest(EVP_CIPHER_CTX *de,
 		   u_char* key,
 		   int key_len);
 int compress_cipher_frame(u_char **pCmp_cipher_frame,
-		      ulong *compressed_frame_len,	  
-		      u_char * cipher_frame,
-		      int cipher_frame_len);
+			  ulong *compressed_frame_len,	  
+			  u_char * cipher_frame,
+			  int cipher_frame_len);
 int uncompress_cipher_frame(u_char** pUncomp_cipher_frame,
 			    u_char* pCmp_cipher_frame,
 			    ulong *uncompressed_frame_len,
 			    ulong compressed_frame_len);
+
 #endif /*_CRYPTOZIS_H_*/

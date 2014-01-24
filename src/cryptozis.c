@@ -79,7 +79,7 @@ static u_char *aes_decrypt(EVP_CIPHER_CTX *e, unsigned char *ciphertext, int *le
 returns the Encrypted cipher frame using the key.
 Also gives the SHA 256 of the encrypted frame (cipher frame)
 */
-int enrypt_digest(EVP_CIPHER_CTX *en,
+int encrypt_digest(EVP_CIPHER_CTX *en,
 		  u_char* frame,
 		  u_char** sha_frame,
 		  u_char** encr_frame,
