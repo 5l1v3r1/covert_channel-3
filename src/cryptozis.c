@@ -148,16 +148,10 @@ returns the uncompressed frame and its length.
 int  uncompress_cipher_frame(u_char** pUncomp_cipher_frame,
 			     u_char* pCmp_cipher_frame,
 			     ulong *uncompressed_frame_len,
-			     ulong compressed_frame_len,
-			     int cipher_frame_len)
+			     ulong compressed_frame_len)
 {
   int cmp_status;
-  *pUncomp_cipher_frame = (u_int8_t *)malloc((size_t)cipher_frame_len);
-  if (!pUncomp_cipher_frame)
-    {
-      printf("Out of memory!\n");
-      return EXIT_FAILURE;
-    } 
+  u_char *temp[2000];
   cmp_status = uncompress(*pUncomp_cipher_frame, uncompressed_frame_len, pCmp_cipher_frame, compressed_frame_len);
   if (cmp_status != Z_OK)
     {
@@ -165,6 +159,15 @@ int  uncompress_cipher_frame(u_char** pUncomp_cipher_frame,
       free(pUncomp_cipher_frame);
       return EXIT_FAILURE;
     }
+  *pUncomp_cipher_frame = (u_int8_t *)malloc((size_t)*uncompressed_frame_len);
+  if (!pUncomp_cipher_frame)
+    {
+      printf("Out of memory!\n");
+      return EXIT_FAILURE;
+    } 
+  memset(*pUncomp_cipher_frame ,0,*uncompressed_frame_len);
+  memcpy(*pUncomp_cipher_frame ,temp,*uncompressed_frame_len);
+  
   return 0;
 }
 
@@ -208,7 +211,7 @@ int main(int argc, char **argv)
   enrypt_digest(&en,frame,&sha_orig_frame, &cipher_frame,&cipher_frame_len,key_data,key_data_len);
   compressed_frame_len = compressBound(cipher_frame_len);
   compress_cipher_frame(&pCmp_cipher_frame, &compressed_frame_len, cipher_frame, cipher_frame_len);
-  uncompress_cipher_frame(&pUncomp_cipher_frame, pCmp_cipher_frame, &uncompressed_frame_len, compressed_frame_len, cipher_frame_len );
+  uncompress_cipher_frame(&pUncomp_cipher_frame, pCmp_cipher_frame, &uncompressed_frame_len, compressed_frame_len);
   decrypted_frame_len=cipher_frame_len;
   decrypt_digest(&de,pUncomp_cipher_frame, &sha_decr_frame, &decrypted_frame,&decrypted_frame_len,key_data,key_data_len);
   if ((uncompressed_frame_len != cipher_frame_len) || (memcmp(pUncomp_cipher_frame, cipher_frame, (size_t)cipher_frame_len)))

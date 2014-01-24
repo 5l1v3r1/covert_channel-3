@@ -31,6 +31,5 @@ int compress_cipher_frame(u_char **pCmp_cipher_frame,
 int uncompress_cipher_frame(u_char** pUncomp_cipher_frame,
 			    u_char* pCmp_cipher_frame,
 			    ulong *uncompressed_frame_len,
-			    ulong compressed_frame_len,
-			    int cipher_frame_len);
+			    ulong compressed_frame_len);
 #endif /*_CRYPTOZIS_H_*/
