@@ -75,28 +75,37 @@ static u_char *aes_decrypt(EVP_CIPHER_CTX *e, unsigned char *ciphertext, int *le
   *len = p_len + f_len;
   return plaintext;
 }
-
+/*
+returns the Encrypted cipher frame using the key.
+Also gives the SHA 256 of the encrypted frame (cipher frame)
+*/
 int enrypt_digest(EVP_CIPHER_CTX *en,
-		  u_char *frame,
+		  u_char* frame,
 		  u_char** sha_frame,
-		  u_char **encr_frame,
-		  int*encr_frame_len,
-		  u_char* key,int key_len)
+		  u_char** encr_frame,
+		  int* encr_frame_len,
+		  u_char* key,
+          int key_len)
 {
   
   *encr_frame = aes_encrypt(en,frame, encr_frame_len);
   if (*encr_frame ==NULL)
     return -1;
-  *sha_frame = HMAC(EVP_sha256(), key, key_len, frame, (const int) (*encr_frame_len), NULL, NULL);
+  *sha_frame = HMAC(EVP_sha256(), key, key_len, *encr_frame, (const int) (*encr_frame_len), NULL, NULL);
   return 0;
 }
 
+/*
+returns the Decrypted cipher frame(already uncompressed), using the key.
+Also gives the SHA 256 of the cipher text.
+*/
 int decrypt_digest(EVP_CIPHER_CTX *de,
-		   u_char * pUncomp_cipher_frame, 
+		   u_char* pUncomp_cipher_frame, 
 		   u_char** sha_frame,
-		   u_char **decr_frame,
+		   u_char** decr_frame,
 		   int* decr_frame_len,
-		   u_char *key,int key_len)
+		   u_char* key,
+           int key_len)
 {
   *decr_frame = aes_decrypt(de, pUncomp_cipher_frame, decr_frame_len);
   if (*decr_frame ==NULL)
@@ -104,6 +113,10 @@ int decrypt_digest(EVP_CIPHER_CTX *de,
   *sha_frame = HMAC(EVP_sha256(), key, key_len, *decr_frame, (const int)*decr_frame_len, NULL, NULL);
   return 0;
 }
+
+/*
+returns the Compressed the cipher frame and the compressed length.
+*/
 int compress_cipher_frame(u_char **pCmp_cipher_frame,
 			  ulong *compressed_frame_len,
 			  u_char * cipher_frame,
@@ -126,6 +139,12 @@ int compress_cipher_frame(u_char **pCmp_cipher_frame,
 
   return 0;
 }
+
+
+/*
+returns the uncompressed frame and its length.
+*/
+
 int  uncompress_cipher_frame(u_char** pUncomp_cipher_frame,
 			     u_char* pCmp_cipher_frame,
 			     ulong *uncompressed_frame_len,
