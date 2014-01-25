@@ -109,7 +109,7 @@ int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_l
   memcpy(*fetch_data,fetch_node->compressed_data,fetch_node->compressed_data_len);
   *fetch_data_len =fetch_node->compressed_data_len;
   *hmac_zip_data = malloc(32);
-  memset(*hmac_zip_data,0, fetch_node->compressed_data_len);
+  memset(*hmac_zip_data,0, 32);
   memcpy(*hmac_zip_data,fetch_node->hmac_zip_data,32);
 
   free(fetch_node);
