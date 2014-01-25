@@ -174,8 +174,8 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
   int mac_hdr_len  = (FC_TO_DS(fc) && FC_FROM_DS(fc)) ? 30 : 24;  
   if (DATA_FRAME_IS_QOS(FC_SUBTYPE(fc)))
     mac_hdr_len += 2;
-  packet +=(mac_hdr_len+8);
-  capture_len -= (mac_hdr_len+8);
+  packet +=(mac_hdr_len); //TODO: FIXME: Does not work with adding 8 bytes
+  capture_len -= (mac_hdr_len);
   llc = (struct llc_hdr *) packet;
   if (ntohs(llc->snap.ether_type) == ETHERTYPE_IP){
     packet +=sizeof(struct llc_hdr);
@@ -343,7 +343,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
        Copy HMAC
        Transmit
      */
-
+    u_char *hmac;
     u_char* frame_to_transmit=NULL;
     int len_frame_to_transmit = 0;
     int copy_len= radiotap_len+ mac_hdr_len+ sizeof(struct ip)+ sizeof(struct llc_hdr)+8+ \
@@ -352,7 +352,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     memset(frame_to_transmit,'\0',sizeof(frame_to_transmit));
     u_char* start_frame_to_transmit= frame_to_transmit;
     u_char * content;
-    beg_del_element(&config.tun_f_list,&content, &message_len);
+    beg_del_element(&config.tun_f_list,&content, &message_len,&hmac);
     list_size--;
     assert(message_len>0);
 
@@ -377,7 +377,8 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     frame_to_transmit +=message_offset;
     memcpy(frame_to_transmit,(u_char*)&message_len,SHORT_SIZE); 
     frame_to_transmit +=SHORT_SIZE;
-
+    memcpy(frame_to_transmit,hmac,32);
+    frame_to_transmit +=32;
     /*testing*
     memcpy(frame_to_transmit,"abhinav abhinav", sizeof("abhinav abhinav"));
     frame_to_transmit += sizeof("abhinav abhinav");
