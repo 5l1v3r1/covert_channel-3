@@ -94,7 +94,7 @@ int print_list(node *p)
 /*
   Fetches the packet buffer and the packet len from the linked list 
 */
-int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_len )
+int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_len,u_char** hmac_zip_data )
 {
   node * fetch_node;
   fetch_node = *p_head ;
@@ -108,6 +108,10 @@ int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_l
   memset(*fetch_data,0, fetch_node->compressed_data_len);
   memcpy(*fetch_data,fetch_node->compressed_data,fetch_node->compressed_data_len);
   *fetch_data_len =fetch_node->compressed_data_len;
+  *hmac_zip_data = malloc(32);
+  memset(*hmac_zip_data,0, fetch_node->compressed_data_len);
+  memcpy(*hmac_zip_data,fetch_node->hmac_zip_data,32);
+
   free(fetch_node);
   list_size--;
 }
@@ -127,20 +131,21 @@ int test_suit()
   print_list(head);
   u_char * d1;
   u_char * d2;
+  u_char * hmac;
   u_int16_t l1,l2;
-  beg_del_element(&head, &d1, &l1);
+  beg_del_element(&head, &d1, &l1, &hmac);
   printf("the stuff that we got: %s %d\n",d1,l1);
   print_list(head );
   printf("==\n");
-  beg_del_element(&head, &d2, &l2);
+  beg_del_element(&head, &d2, &l2, &hmac);
   printf("the stuff that we got: %s %d\n",d2,l2);
   print_list(head);
   printf("@@\n");
-  beg_del_element(&head, &d2, &l2);
+  beg_del_element(&head, &d2, &l2, &hmac);
   printf("the stuff that we got: %s %d\n",d2,l2);
   print_list(head);
   printf("$$\n");
-  beg_del_element(&head, &d2, &l2);
+  beg_del_element(&head, &d2, &l2, &hmac);
   print_list(head);
 
 }
