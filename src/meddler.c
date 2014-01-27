@@ -121,7 +121,6 @@ int transmit_on_wifi(u_char* frame_to_transmit, int pkt_len)
     return -1;
   }
   printf("transmitted on wifi");
-  exit(1);
   return 0;
 }
 
@@ -283,7 +282,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
   struct llc_hdr *llc;
   struct tcp_hdr *tcp_h;
   struct ssl_hdr *ssl_h;
-  u_int16_t IP_header_length,fc,seq_no,duration_id,message_len=-1;
+  u_int16_t IP_header_length,fc,seq_no,duration_id,message_len;
   u_int32_t message_offset;
   u_int32_t pkt_len=capture_len;
   int tcp_options =TCP_OPTIONS; //TCP options
@@ -364,7 +363,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
 
     memcpy(frame_to_transmit, u8aRadiotapHeader,sizeof (u8aRadiotapHeader));
     frame_to_transmit += sizeof (u8aRadiotapHeader);
-
+    /*
     struct ieee80211_hdr * ih = (struct ieee80211_hdr *) u8aIeeeHeader;
     fc= fc | BIT(6); // for WEP bit to be turned on
     memcpy(&(ih->frame_control),(u_char*)&fc,2); 
@@ -373,7 +372,7 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     memcpy(&(ih->addr1),mac_address_start+MAC_HDR,MAC_HDR);
     memcpy(&(ih->addr1),mac_address_start+(2+MAC_HDR),MAC_HDR);
     memcpy(&(ih->seq_ctrl),(u_char*)&seq_no,2);
-    
+    */ 
     memcpy(frame_to_transmit, u8aIeeeHeader, sizeof (u8aIeeeHeader));
     frame_to_transmit += sizeof (u8aIeeeHeader);
 
@@ -396,7 +395,6 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     //memcpy(frame_to_transmit,packet_start,copy_len);
     //framing_covert_message(frame_to_transmit+copy_len,remaining_bytes);
     //copy rest of the frame
-    debug_++;
     printf("pkt size %ld %u\n",frame_to_transmit-start_frame_to_transmit,pkt_len);
     transmit_on_wifi(start_frame_to_transmit, pkt_len); //frame_to_transmit-start_frame_to_transmit);
     free(start_frame_to_transmit);
