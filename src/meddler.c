@@ -242,7 +242,13 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
         return -1;
     }
 
-    decrypt_digest(&config.de, uncompressed_cipher_frame, &sha_decr_frame, &decrypted_tun_frame, &uncompressed_frame_len, config.shared_key, config.shared_key_len);
+    return_val =decrypt_digest(&config.de, uncompressed_cipher_frame, &sha_decr_frame, &decrypted_tun_frame, &uncompressed_frame_len, config.shared_key, config.shared_key_len);
+    if (return_val <0)
+    {
+        free(hmac);
+        free(compressed_message);
+        return -1;
+    }
     if(memcmp(sha_decr_frame,hmac,SHA_SIZE))
     {
         printf("SHA of the frame is correct\n");
@@ -339,15 +345,6 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     {
       return -1; /*for now it's mtu=150 bytes*/
     }
-    /* TODO:
-       Encrypt message
-       Copy mesg length
-       Encrypt part of message
-       Copy the message at offset
-       Calculate HMAC
-       Copy HMAC
-       Transmit
-     */
     u_char *hmac;
     u_char* frame_to_transmit=NULL;
     int len_frame_to_transmit = 0;
@@ -382,19 +379,13 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     frame_to_transmit +=message_offset;
     memcpy(frame_to_transmit,(u_char*)&message_len,SHORT_SIZE); 
     frame_to_transmit +=SHORT_SIZE;
-    memcpy(frame_to_transmit,hmac,32);
-    frame_to_transmit +=32;
-    /*testing*
-    memcpy(frame_to_transmit,"abhinav abhinav", sizeof("abhinav abhinav"));
-    frame_to_transmit += sizeof("abhinav abhinav");
-    */
-
+    memcpy(frame_to_transmit,hmac,SHA_SIZE);
+    frame_to_transmit +=SHA_SIZE;
     memcpy(frame_to_transmit, content,message_len);
     printf("fr_to_tx: %02x %02x %02x %02x \n",*(frame_to_transmit),*(frame_to_transmit+1),*(frame_to_transmit+2), *(frame_to_transmit+3));
     frame_to_transmit +=message_len ;
     //memcpy(frame_to_transmit,packet_start,copy_len);
     //framing_covert_message(frame_to_transmit+copy_len,remaining_bytes);
-    //copy rest of the frame
     printf("pkt size %ld %u\n",frame_to_transmit-start_frame_to_transmit,pkt_len);
     transmit_on_wifi(start_frame_to_transmit, pkt_len); //frame_to_transmit-start_frame_to_transmit);
     free(start_frame_to_transmit);
@@ -408,8 +399,6 @@ int packet_parse(const unsigned char *packet, struct timeval ts,unsigned int cap
   u_int16_t radiotap_len=0;
   u_int32_t present=0;
   struct ieee80211_radiotap_header *hdr;
-  if (packet ==NULL)
-    printf("is null\n");
   hdr = (struct ieee80211_radiotap_header *)packet;
   radiotap_len = pletohs(&hdr->it_len);
   present = pletohl(&hdr->it_present);
@@ -442,8 +431,6 @@ int print_tun_frame_content(u_char* orig_covert_frame, int tun_frame_cap_len)
       printf("IP header with options\n");
       return -1;
     }
-  //printf("ip offset is offset=%u dont_frag=%u more_frag=%u\n", offset, dont_frag, more_frag);
-  //printf("ip morefrags=%u dont_frag=%u frag_offset=%u\n", p->more_frags, p->dont_frag, p->frag_offset);  
   if (ip->ip_p == IPPROTO_UDP)
     {
       printf("UDP packet on TUN interface\n");

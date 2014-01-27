@@ -90,9 +90,12 @@ int encrypt_digest(EVP_CIPHER_CTX *en,
   
   *encr_frame = aes_encrypt(en,frame, encr_frame_len);
   if (*encr_frame ==NULL)
-    return -1;
+    return -1;    
   *sha_frame = HMAC(EVP_sha256(), key, key_len, *encr_frame, (const int) (*encr_frame_len), NULL, NULL);
-  return 0;
+  if (*sha_frame ==NULL)
+    return -1;
+  else   
+    return 0;
 }
 
 /*
@@ -111,7 +114,10 @@ int decrypt_digest(EVP_CIPHER_CTX *de,
   if (*decr_frame ==NULL)
     return -1;
   *sha_frame = HMAC(EVP_sha256(), key, key_len, *decr_frame, (const int)*decr_frame_len, NULL, NULL);
-  return 0;
+  if (*sha_frame ==NULL)
+    return -1;
+  else   
+    return 0;
 }
 
 /*

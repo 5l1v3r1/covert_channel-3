@@ -9,6 +9,7 @@
 static int list_size=0;
 int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
 {
+  int return_val;
   struct node * element= (struct node *) malloc (sizeof(struct node));
   memset(element, 0, sizeof(element));
   element->data = malloc(data_blob_size);
@@ -20,10 +21,19 @@ int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
   element->data_len=data_blob_size;
   memcpy(element->data,data_blob,data_blob_size);
   element->cipher_data_len = data_blob_size;
-  encrypt_digest(&config.en, element->data,&(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
+  return_val =encrypt_digest(&config.en, element->data,&(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
+  if (return_val ==EXIT_FAILURE)
+  {
+    free(element);
+    return -1;
+  }
   element->compressed_data_len = compressBound(element->cipher_data_len);
-  compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
-
+  return_val =compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
+  if (return_val <0)
+  {
+    free(element);
+    return -1;
+  }
   if (*p_head ==NULL)
     {
       *p_head =element;
@@ -35,15 +45,16 @@ int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
       *p_head = element;
     }
   list_size++;
+  return 0;
 }
 /*
 Adds the packet buffer and the packet buffer length to the linked 
 list.
 */
 int end_add_element(node **p_head , u_char * data_blob, int data_blob_size)
-{  
+{
+  int return_val;
   node * temp;
-
   node * element= (node *) malloc (sizeof(struct node));
   memset(element, 0, sizeof(element));
   element->data = malloc(data_blob_size);
@@ -54,10 +65,19 @@ int end_add_element(node **p_head , u_char * data_blob, int data_blob_size)
   element->data_len = data_blob_size;
   memcpy(element->data,data_blob,data_blob_size);
   element->cipher_data_len = data_blob_size;
-  encrypt_digest(&config.en, element->data, &(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
+  return_val=encrypt_digest(&config.en, element->data, &(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
+  if (return_val==EXIT_FAILURE)
+  {
+    free(element);
+    return -1;
+  }
   element->compressed_data_len = compressBound(element->cipher_data_len);
-  compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
-
+  return_val=compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
+  if(return_val<0)
+  {
+    free(element);
+    return -1;
+  }
   temp = *p_head ;
   if (*p_head ==NULL)
     {
@@ -67,7 +87,7 @@ int end_add_element(node **p_head , u_char * data_blob, int data_blob_size)
   else
     {
       while (temp->next !=NULL)
-	temp=temp->next;
+	    temp=temp->next;
       element->next =NULL;
       temp->next=element;
     }
