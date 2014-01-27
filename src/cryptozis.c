@@ -151,12 +151,11 @@ int  uncompress_cipher_frame(u_char** pUncomp_cipher_frame,
 			     ulong compressed_frame_len)
 {
   int cmp_status;
-  u_char *temp[2000];
-  cmp_status = uncompress(*pUncomp_cipher_frame, uncompressed_frame_len, pCmp_cipher_frame, compressed_frame_len);
+  u_char temp[2000];
+  cmp_status = uncompress(temp, uncompressed_frame_len, pCmp_cipher_frame, compressed_frame_len);
   if (cmp_status != Z_OK)
     {
       printf("uncompress failed!\n");
-      free(pUncomp_cipher_frame);
       return EXIT_FAILURE;
     }
   *pUncomp_cipher_frame = (u_int8_t *)malloc((size_t)*uncompressed_frame_len);

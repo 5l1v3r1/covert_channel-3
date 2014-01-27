@@ -227,22 +227,29 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
     memcpy(hmac,packet,SHA_SIZE);
     packet +=SHA_SIZE;
     u_char* compressed_message;
-    compressed_message = malloc(compressed_covert_mesg_size);
-    memset(compressed_message,0,compressed_covert_mesg_size);
-    memcpy(compressed_message,packet,compressed_covert_mesg_size);
-    ulong uncompressed_frame_len=0;
+    compressed_message = malloc((size_t)compressed_covert_mesg_size);
+    memset(compressed_message,0,(size_t)compressed_covert_mesg_size);
+    memcpy(compressed_message,packet,(size_t)compressed_covert_mesg_size);
+    ulong uncompressed_frame_len;
     u_char*uncompressed_cipher_frame;
     u_char*decrypted_tun_frame;
     u_char* sha_decr_frame;
-    int decrypted_tun_frame_len;
-    uncompress_cipher_frame(&uncompressed_cipher_frame, compressed_message, &uncompressed_frame_len, compressed_covert_mesg_size);
-    decrypt_digest(&config.de, uncompressed_cipher_frame, &sha_decr_frame, &decrypted_tun_frame, &decrypted_tun_frame_len, config.shared_key, config.shared_key_len);
+    int return_val;
+    return_val =uncompress_cipher_frame(&uncompressed_cipher_frame, compressed_message, &uncompressed_frame_len, (ulong) compressed_covert_mesg_size);
+    if(return_val ==EXIT_FAILURE)
+    {
+        free(hmac);
+        free(compressed_message);
+        return -1;
+    }
+
+    decrypt_digest(&config.de, uncompressed_cipher_frame, &sha_decr_frame, &decrypted_tun_frame, &uncompressed_frame_len, config.shared_key, config.shared_key_len);
     if(memcmp(sha_decr_frame,hmac,SHA_SIZE))
     {
         printf("SHA of the frame is correct\n");
       printf("message send to tun driver now\n");
 	//Take the message packet and write it to the tun descriptor
-	if((bytes_written=write(config.tun_fd,decrypted_tun_frame,decrypted_tun_frame_len))<0)
+	if((bytes_written=write(config.tun_fd,decrypted_tun_frame,uncompressed_frame_len))<0)
 	  { 
 	    perror("Error in writing the message frame to TUN interface\n");
 	    exit(-1);
@@ -257,8 +264,7 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
         printf("SHA of the frame is INcorrect\n");
     }
 
-    free(compressed_message);
-    free(sha_decr_frame); 
+    free(compressed_message); 
     free(decrypted_tun_frame);
     free(uncompressed_cipher_frame);
   }
