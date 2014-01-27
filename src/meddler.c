@@ -457,34 +457,69 @@ int print_tun_frame_content(u_char* orig_covert_frame, int tun_frame_cap_len)
   printf("done with process_tun_frame \n");
  return 0;
 }
-
-int main()
+int debug=0;
+int main(int argc, char** argv)
 {
   u_char buf[PACKET_SIZE];
   char ifname[IFNAMSIZ];
   int tun_frame_cap_len,rad_ret;
   const u_char * radiotap_packet;
   struct pcap_pkthdr header;
-
-
-
+  char * mon_ifname="phy6";  
   config.shared_key = (u_char*)"20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
   u_char k[]="20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
   config.shared_key_len=sizeof(k);
   memcpy(config.salt, (u_int32_t[]) {12345, 54321}, sizeof config.salt);
-
   config.tun_f_list =NULL;
 
-  char * mon_interface="phy6";
-  config.wifi_pcap= pcap_radiotap_handler(mon_interface);
+  extern char *optarg;
+  extern int optind;
+  int c, err = 0;
+  int tflag=0, ri_flag=0;
+  char *tun_ifname = "tun2";
+  static char usage[] = "usage: %s [-d] -r read_interface  [-s tun_ifname] \n";
+
+  while ((c = getopt(argc, argv, "dtr:")) != -1)
+    switch (c) {
+    case 'd':
+      debug = 1;
+      break;
+    case 't':
+      tflag = 1;
+      tun_ifname = optarg;
+      break;
+    case 'r':
+      ri_flag = 1;
+      mon_ifname = optarg;
+      break;
+    case '?':
+      err = 1;
+      break;
+    }
+
+  if (ri_flag == 0) {/* -r is mandatory */
+    fprintf(stderr, "%s: missing -r option\n", argv[0]);
+    fprintf(stderr, usage, argv[0]);
+    exit(-1);
+  } else if ((optind+1) < argc) {
+    /* need at least one argument (change +1 to +2 for two, etc. as needeed) */
+    printf("optind = %d, argc=%d\n", optind, argc);
+    fprintf(stderr, "%s: fumissing name\n", argv[0]);
+    fprintf(stderr, usage, argv[0]);
+    exit(-1);
+  } else if (err) {
+    fprintf(stderr, usage, argv[0]);
+    exit(-1);
+  }
+
+  config.wifi_pcap= pcap_radiotap_handler(mon_ifname);
   if (pcap_setnonblock(config.wifi_pcap, 1, errbuf) == -1) {
     fprintf(stderr, "pcap_setnonblock failed: %s\n", errbuf);
     exit(-1);
   }
 
   config.pcap_fd = pcap_get_selectable_fd(config.wifi_pcap);
-
-  strcpy(ifname, "tun2");
+  strcpy(ifname, tun_ifname);
   if ((config.tun_fd= tun_allocation(ifname)) < 0) {
     fprintf(stderr, "tunnel interface allocation failed\n");
     exit(-1);
