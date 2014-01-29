@@ -6,7 +6,11 @@ channel. The repo currently has the userland code for creating a covert channel 
 
 TODO: 
 Have to look at 802.11 encryption scheme in software
-Have to find a cardbus/USB type ath9k wifi card to stick in the laptop
+Change radiotap bitrate 
+Set restransmit bit 
+Public key encryption to share symmetric key
+WEP bit screws up transmission ? or drops at the receiver
+
 
 
 For build :
