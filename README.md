@@ -8,7 +8,7 @@ TODO:
 Have to look at 802.11 encryption scheme in software
 Change radiotap bitrate 
 Set restransmit bit 
-Public key encryption to share symmetric key
+Public key encryption to share symmetric key(have tested code to be merged)
 WEP bit screws up transmission ? or drops at the receiver
 
 
