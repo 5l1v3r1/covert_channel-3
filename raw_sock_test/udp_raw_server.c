@@ -24,6 +24,11 @@ not receivers.
 #include <netinet/ip.h>
 
 #define PACKET_LEN 1500
+
+#ifndef IP_OFFMASK
+#define IP_OFFMASK 0x1fff
+#endif
+
 // UDP header's structure
 struct udpheader {
   unsigned short int udph_srcport;
@@ -236,13 +241,16 @@ int main(int argc, char *argv[])
     {
         printf("UDP packet\n");
     }
-    int ip_offset = (ip->ip_off & 0x1fff) * 8;
+    int ip_offset = ntohs(ip->ip_off);
+    int offset=0;
     
     printf("flag= %x\n",(ip->ip_off & 0xe000));
    // IP_DF 0x4000            /* dont fragment flag */
    // IP_MF 0x2000            /* more fragments flag */
-    if (ip_offset ==0 )
+    if (ip_offset & IP_OFFMASK )
     { //implies a udp header is present
+    int offset = (ip_off & IP_OFFMASK) << 3;
+    int more= (ip_off & IP_MF) ? 1 : 0;
     struct udpheader *tu= (struct udpheader *)(buffer+sizeof(struct ip));
     printf("after src_port =%u\n", ntohs(tu-> udph_srcport));
     printf("after dest_port = %u\n",ntohs(tu->udph_destport));
