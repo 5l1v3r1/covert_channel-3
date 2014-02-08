@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
 #include <net/if.h>
+#include <arpa/inet.h>
 #include <errno.h>
 #include <pcap.h>
 #include <assert.h>
@@ -21,6 +22,7 @@
 #include "link_list.h"
 #include "cryptozis.h"
 
+fd_set rd_set;
 int debug=0;
 static int list_size =0;
 static const u8 u8aRadiotapHeader[] = {
@@ -140,7 +142,6 @@ u_int32_t covert_message_offset(u_int32_t seq,u_int32_t ack, u_int32_t pkt_len)
 */
 int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int32_t capture_len)
 {
-  printf("#");
   struct ip *ip;
   struct llc_hdr *llc;
   struct tcp_hdr *tcp_h;
@@ -181,12 +182,12 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
     packet += tcp_options;
     capture_len -= tcp_options;
     ssl_h = (struct ssl_hdr *)packet;
-    printf("message received bef ssl v= %02x %02x%02x\n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1),  *((u_int8_t*)(ssl_h)+2) );
+    //printf("message received bef ssl v= %02x %02x%02x\n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1),  *((u_int8_t*)(ssl_h)+2) );
     if (ssl_h->ssl_content_type != 0x17)
     {
+      //printf("not 17\n");
       return -1; /*there should be content in the traffic*/
     }
-    printf("message received ssl v= %02x %02x%02x\n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1),  *((u_int8_t*)(ssl_h)+2) );
 
     packet += sizeof(struct ssl_hdr);
     capture_len -= sizeof(struct ssl_hdr);
@@ -217,6 +218,7 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
     u_char*decrypted_tun_frame;
     u_char* sha_decr_frame;
     int return_val;
+    printf("trying uncompress\n");
     return_val =uncompress_cipher_frame(&uncompressed_cipher_frame, compressed_message, &uncompressed_frame_len, (ulong) compressed_covert_mesg_size);
     if(return_val ==EXIT_FAILURE)
     {
@@ -224,7 +226,7 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
         free(compressed_message);
         return -1;
     }
-
+    printf("uncompressed successfully\n");
     return_val =decrypt_digest(&config.de, uncompressed_cipher_frame, &sha_decr_frame, &decrypted_tun_frame, (int*)&uncompressed_frame_len, config.shared_key, config.shared_key_len);
     if (return_val <0)
     {
@@ -232,6 +234,7 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
         free(compressed_message);
         return -1;
     }
+    printf("decrypted correctly\n");
     if(memcmp(sha_decr_frame,hmac,SHA_SIZE))
     {
         printf("correct SHA and shoving to TUN\n");
@@ -242,7 +245,7 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
 	  }
     else
       {
-        printf("packet is written to tun driver yay!\n");    
+        printf("packet is written to tun driver yay!\n"); 
       } 
     }
     else
@@ -250,9 +253,9 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
         printf("SHA of the frame is INcorrect\n");
     }
 
-    free(compressed_message); 
-    free(decrypted_tun_frame);
-    free(uncompressed_cipher_frame);
+    //free(compressed_message); 
+    //free(decrypted_tun_frame);
+    //free(uncompressed_cipher_frame); 
   }
   return 0;
 }
@@ -385,12 +388,12 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
 
     memcpy(frame_to_transmit,packet,capture_len);
     frame_to_transmit +=capture_len; 
-    while(1){
+    //while(1){
     printf("pkt size diff=%ld pkt_len%u cap_len=%d\n",(frame_to_transmit-start_frame_to_transmit),pkt_len,capture_len);
     transmit_on_wifi(start_frame_to_transmit, pkt_len); //frame_to_transmit-start_frame_to_transmit);
-    }
-    free(start_frame_to_transmit);
-    free(content);
+    //}
+    //free(start_frame_to_transmit);
+    //free(content);
   }
   return 0 ;
 }
@@ -407,18 +410,18 @@ int packet_parse(const unsigned char *packet, struct timeval ts,unsigned int cap
     }
   if (radiotap_len ==14)
     {
-      printf("caplen->%d\n",capture_len);
+      printf("injection caplen->%d\n",capture_len);
       message_injection(packet, radiotap_len, capture_len); 
     }
   else 
     { /*need frames that are sent out through device */
-     // printf("caplen->%d\n",capture_len);
-     // message_reception(packet, radiotap_len, capture_len); //to be enabled at receiver side
+      //printf("#");//reception caplen->%d\n",capture_len);
+      message_reception(packet, radiotap_len, capture_len); //to be enabled at receiver side
     }
     return 0;
 }
 
-int print_tun_frame_content(u_char* orig_covert_frame, int tun_frame_cap_len)
+int check_tun_frame_content(u_char* orig_covert_frame, int tun_frame_cap_len)
 {
   struct ip *ip;
   struct udp_hdr *udp;
@@ -429,6 +432,8 @@ int print_tun_frame_content(u_char* orig_covert_frame, int tun_frame_cap_len)
       printf("IP header with options\n");
       return -1;
     }
+    int src_addr =0;
+    src_addr = inet_addr("10.0.0.12");
   if (ip->ip_p == IPPROTO_UDP)
     {
       printf("UDP packet on TUN interface\n");
@@ -444,16 +449,24 @@ int print_tun_frame_content(u_char* orig_covert_frame, int tun_frame_cap_len)
     {
       printf("TCP packet %d\n",ip->ip_p);
     }
-  else if (ip->ip_p ==IPPROTO_UDP){
-    printf("UDP %d\n", ip->ip_p);
-  }
   else
     {
-      printf("none of them\n");
+      printf("none of the protocol; ICMP mostly ?\n");
     }
-  // send this on raw socket
-  printf("done with process_tun_frame \n");
- return 0;
+    int temp = ip->ip_src.s_addr;
+    printf("src=%x \n",ip->ip_src.s_addr);
+    printf("dst=%x \n",ip->ip_dst.s_addr);
+    printf("src_addr=%x  %x\n",src_addr,temp);
+    if (temp==src_addr)
+    {
+        printf("bad\n");
+        return -1;
+    }
+    else
+    {
+        printf("good\n");
+        return 0;
+    }
 }
 int main(int argc, char** argv)
 {
@@ -471,7 +484,7 @@ int main(int argc, char** argv)
 
   extern char *optarg;
   extern int optind;
-  int c, err = 0;
+  int c, check=0, err = 0;
   int tflag=0, ri_flag=0;
   char *tun_ifname = "tun2";
   static char usage[] = "usage: %s [-d] -r read_interface  [-s tun_ifname] \n";
@@ -532,7 +545,6 @@ int main(int argc, char** argv)
   while(1)
   {
     int ret;
-    fd_set rd_set;
     
     FD_ZERO(&rd_set);
     FD_SET(config.tun_fd, &rd_set); 
@@ -557,11 +569,14 @@ int main(int argc, char** argv)
 	    close(config.tun_fd);
 	    exit(1);
 	  }
+	check=check_tun_frame_content(buf, tun_frame_cap_len);
+    if (check==0)
+    {
 	end_add_element(&config.tun_f_list, buf ,tun_frame_cap_len);
 	list_size++;
+    }
 	printf("%02x %02x %02x %02x \n",*buf, *(buf+1), *(buf+2),*(buf+3));
 	printf("read %d bytes from tunnel interface %s.\n-----\n", tun_frame_cap_len, ifname);
-	print_tun_frame_content(buf, tun_frame_cap_len);
       }
     if(FD_ISSET(config.pcap_fd, &rd_set))
       {
