@@ -1,11 +1,14 @@
-#include <zlib.h>
-#include <stdio.h>
-#ifdef STDC
-#  include <string.h>
-#  include <stdlib.h>
-#endif
-#include <stdint.h>
 #include "config.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <zlib.h>
+#include <string.h>
+#include <math.h>
+/*
+  Part of code is taken from StackOverflow discussions and combined with the following link code
+  https://shanetully.com/2012/06/openssl-rsa-aes-and-c
+ */
 /**
  * Create an 256 bit key and IV using the supplied key_data. salt can be added for taste.
  * Fills in the encryption and decryption ctx objects and returns 0 on success
@@ -32,6 +35,20 @@ int aes_init(unsigned char *key_data, int key_data_len, unsigned char *salt, EVP
   EVP_CIPHER_CTX_init(d_ctx);
   EVP_DecryptInit_ex(d_ctx, EVP_aes_256_cbc(), NULL, key, iv);
 
+  return 0;
+}
+
+
+int rsa_encrypt_init(EVP_CIPHER_CTX *rsa_en)
+{
+  EVP_CIPHER_CTX_init(rsa_en); 
+  return 0;
+}
+
+int rsa_decrypt_init(EVP_CIPHER_CTX *rsa_de)
+{
+  // Init these here to make valgrind happy
+  EVP_CIPHER_CTX_init(rsa_de);
   return 0;
 }
 
@@ -80,12 +97,12 @@ returns the Encrypted cipher frame using the key.
 Also gives the SHA 256 of the encrypted frame (cipher frame)
 */
 int encrypt_digest(EVP_CIPHER_CTX *en,
-		  u_char* frame,
-		  u_char** sha_frame,
-		  u_char** encr_frame,
-		  int* encr_frame_len,
-		  u_char* key,
-          int key_len)
+		   u_char* frame,
+		   u_char** sha_frame,
+		   u_char** encr_frame,
+		   int* encr_frame_len,
+		   u_char* key,
+		   int key_len)
 {
   
   *encr_frame = aes_encrypt(en,frame, encr_frame_len);
@@ -108,7 +125,7 @@ int decrypt_digest(EVP_CIPHER_CTX *de,
 		   u_char** decr_frame,
 		   int* decr_frame_len,
 		   u_char* key,
-           int key_len)
+		   int key_len)
 {
   *decr_frame = aes_decrypt(de, pUncomp_cipher_frame, decr_frame_len);
   if (*decr_frame ==NULL)
@@ -175,6 +192,180 @@ int  uncompress_cipher_frame(u_char** pUncomp_cipher_frame,
   
   return 0;
 }
+
+
+int rsa_encrypt(const u_char *msg,
+		size_t msgLen,
+		u_char **encMsg,
+		u_char **ek,
+		size_t *ekl,
+		u_char **iv,
+		size_t *ivl,
+		EVP_PKEY *key,
+		EVP_CIPHER_CTX * rsaEncryptCtx) 
+{
+  size_t encMsgLen = 0;
+  size_t blockLen  = 0;
+
+  *ek = (u_char*)malloc(EVP_PKEY_size(key));
+  *iv = (u_char*)malloc(EVP_MAX_IV_LENGTH);
+  if(*ek == NULL || *iv == NULL) 
+    return -1;
+  *ivl = EVP_MAX_IV_LENGTH;
+  *encMsg = (u_char*)malloc(msgLen + EVP_MAX_IV_LENGTH);
+  if(encMsg == NULL) 
+    return -1;
+  if(!EVP_SealInit(rsaEncryptCtx, EVP_aes_256_cbc(), ek, (int*)ekl, *iv, &key, 1)) {
+    return -1;
+  }
+  
+  if(!EVP_SealUpdate(rsaEncryptCtx, *encMsg + encMsgLen, (int*)&blockLen, (const u_char*)msg, (int)msgLen)) {
+    return -1;
+  }
+
+  encMsgLen += blockLen;
+  if(!EVP_SealFinal(rsaEncryptCtx, *encMsg + encMsgLen, (int*)&blockLen)) {
+    return -1;
+  }
+  encMsgLen += blockLen;
+
+  EVP_CIPHER_CTX_cleanup(rsaEncryptCtx);
+
+  return (int)encMsgLen;
+}
+
+int rsa_decrypt(u_char *encMsg,
+		size_t encMsgLen,
+		u_char *ek,
+		size_t ekl,
+		u_char *iv,
+		size_t ivl,
+		u_char **decMsg,
+		EVP_PKEY *key,
+		EVP_CIPHER_CTX * rsaDecryptCtx) 
+{
+  size_t decLen   = 0;
+  size_t blockLen = 0;
+ 
+  *decMsg = (u_char*)malloc(encMsgLen + ivl);
+  if(decMsg == NULL) 
+    return -1;
+ 
+  if(!EVP_OpenInit(rsaDecryptCtx, EVP_aes_256_cbc(), ek, ekl, iv, key)) 
+    {
+      return -1;
+    }
+
+  if(!EVP_OpenUpdate(rsaDecryptCtx, (u_char*)*decMsg + decLen, (int*)&blockLen, encMsg, (int)encMsgLen))
+    {
+      return -1;
+    }
+  decLen += blockLen;
+  if(!EVP_OpenFinal(rsaDecryptCtx, (u_char*)*decMsg + decLen, (int*)&blockLen))
+    {
+      return -1;
+    }
+  decLen += blockLen;
+  EVP_CIPHER_CTX_cleanup(rsaDecryptCtx);
+  return (int)decLen;
+}
+
+//Not required for crypto API but used for debug
+//$ ssh-keygen -y -f mykey.pem > mykey.pub
+//openssl genrsa -out mykey.pem 2048
+//openssl rsa -in mykey.pem -pubout > mykey.pub
+
+#define KEY_PRI 0 
+#define KEY_PUB 1 
+
+int printKey(FILE *fd, int code, EVP_PKEY * key) 
+{
+  switch(code) 
+    {
+    case KEY_PRI:
+      printf("server pri\n");
+      if(!PEM_write_PrivateKey(fd, key, NULL, NULL, 0, 0, NULL)) {
+	return -1;
+      }
+    break;
+    
+    case KEY_PUB:
+    printf("server pub\n");
+    if(!PEM_write_PUBKEY(fd, key)) {
+      return -1;
+    }
+    break;
+    
+    default:
+      return -1;
+    }
+  return 0;
+}
+
+char* base64Encode(const u_char *message,
+		   const size_t length) 
+{
+  BIO *bio;
+  BIO *b64;
+  FILE* stream;
+
+  int encodedSize = 4*ceil((double)length/3);
+  char *buffer = (char*)malloc(encodedSize+1);
+  if(buffer == NULL) {
+    fprintf(stderr, "Failed to allocate memory\n");
+    exit(1);
+  }
+     
+  stream = fmemopen(buffer, encodedSize+1, "w");
+  b64 = BIO_new(BIO_f_base64());
+  bio = BIO_new_fp(stream, BIO_NOCLOSE);
+  bio = BIO_push(b64, bio);
+  BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
+  BIO_write(bio, message, length);
+  (void)BIO_flush(bio);
+  BIO_free_all(bio);
+  fclose(stream);
+
+  return buffer;
+}
+
+static int calcDecodeLength(const char *b64input, const size_t length) {
+  int padding = 0;
+    
+  // Check for trailing '=''s as padding
+  if(b64input[length-1] == '=' && b64input[length-2] == '=')
+    padding = 2;
+  else if (b64input[length-1] == '=')
+    padding = 1;
+     
+  return (int)length*0.75 - padding;
+}
+ 
+int base64Decode(const char *b64message, const size_t length, u_char **buffer) {
+  BIO *bio;
+  BIO *b64;
+  int decodedLength = calcDecodeLength(b64message, length);
+
+  *buffer = (u_char*)malloc(decodedLength+1);
+  if(*buffer == NULL) {
+    fprintf(stderr, "Failed to allocate memory\n");
+    exit(1);
+  }
+  FILE* stream = fmemopen((char*)b64message, length, "r");
+     
+  b64 = BIO_new(BIO_f_base64());
+  bio = BIO_new_fp(stream, BIO_NOCLOSE);
+  bio = BIO_push(b64, bio);
+  BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
+  decodedLength = BIO_read(bio, *buffer, length);
+  (*buffer)[decodedLength] = '\0';
+     
+  BIO_free_all(bio);
+  fclose(stream);
+     
+  return decodedLength;
+}
+
 
 #if 0
 int main(int argc, char **argv)
