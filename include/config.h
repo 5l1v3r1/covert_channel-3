@@ -3,6 +3,10 @@
 #include <openssl/evp.h>
 #include <openssl/aes.h>
 #include <openssl/hmac.h>
+#include <openssl/rsa.h>
+#include <openssl/bio.h>
+#include <openssl/pem.h>
+#include <openssl/err.h>
 #include <pcap.h>
 #define SALT_SIZE 2
 #define PACKET_SIZE 1515
@@ -31,21 +35,23 @@ typedef struct global_config {
   int tun_fd;
   int pcap_fd;
   pcap_t* wifi_pcap;
+
   u_char* shared_key;
   int shared_key_len;
 
   u_int32_t salt[SALT_SIZE] ;
 
-  u_char * sender_public_key;
-  u_char * sender_private_key;
-  
-  u_char * receiver_public_key;
-  u_char * receiver_private_key;
+  EVP_PKEY * snd_pub_key;
+  EVP_PKEY * rcv_priv_key;
   
   node * tun_f_list ;
 
   EVP_CIPHER_CTX en;
   EVP_CIPHER_CTX de;
+
+  EVP_CIPHER_CTX rsa_en;
+  EVP_CIPHER_CTX rsa_de;
+
 } config_;
 extern config_ config;
 
