@@ -9,7 +9,6 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <errno.h>
-#include <pcap.h>
 #include <assert.h>
 #include <zlib.h>
 #ifdef STDC
@@ -468,6 +467,89 @@ int check_tun_frame_content(u_char* orig_covert_frame, int tun_frame_cap_len)
         return 0;
     }
 }
+
+int rsa_key_setup()
+{
+  RSA *rsa_pubkey = NULL;
+  FILE* rsa_pubkey_file;
+  EVP_PKEY *privkey;
+  rsa_pubkey_file = fopen("./keys/publickey.pub", "rb");
+  RSA *rsa_privkey = NULL;
+  FILE*rsa_privkey_file;
+  config.snd_pub_key  = EVP_PKEY_new();
+  config.rcv_priv_key = EVP_PKEY_new();
+  rsa_privkey_file = fopen("./keys/privkey.pem", "rb");
+  if (!rsa_pubkey_file)
+    {    
+      fprintf(stderr, "Error loading PEM RSA Private Key File.\n");
+      return -1;
+    }
+
+  if (!PEM_read_RSAPrivateKey(rsa_privkey_file, &rsa_privkey, NULL, NULL))
+    {
+      fprintf(stderr, "Error loading RSA Private Key File.\n");
+      ERR_print_errors_fp(stderr);
+      return -1;
+    }
+
+  if (!EVP_PKEY_assign_RSA(config.rcv_priv_key, rsa_privkey))
+    {
+      fprintf(stderr, "EVP_PKEY_assign_RSA: failed.\n");
+      return -1;
+    }
+
+  if (!PEM_read_RSA_PUBKEY(rsa_pubkey_file, &rsa_pubkey, NULL, NULL))
+    {
+      fprintf(stderr, "Error loading RSA Public Key File.\n");
+      ERR_print_errors_fp(stderr);
+      return -1;
+    }
+
+  if (!EVP_PKEY_assign_RSA(config.snd_pub_key, rsa_pubkey))
+    {
+      fprintf(stderr, "EVP_PKEY_assign_RSA: failed.\n");
+      return -1;
+    }
+  return 0;
+}
+int test()
+{
+  u_char *encMsg = NULL;
+  char *decMsg   = NULL;
+  int encMsgLen;
+  int decMsgLen;
+  FILE *keyfile; 
+  u_char *ek ; 
+  u_char *iv ;
+  size_t ekl ;
+  size_t ivl ;
+  u_char *msg = "abhinav is the most guy";
+  int msg_len = strlen("abhinav is the most guy");
+  rsa_decrypt_init(&config.rsa_de);
+  rsa_encrypt_init(&config.rsa_en);
+  if((encMsgLen = rsa_encrypt((const u_char*)msg, msg_len+1, &encMsg, &ek, &ekl, &iv, &ivl, config.snd_pub_key, &config.rsa_en))== -1)
+    {
+      fprintf(stderr, "Encryption failed\n");
+      return 1;
+    }
+
+  printf(" ekl=%d ivl=%d encMsgLen=%d\n",ekl,ivl,encMsgLen);
+
+  printf("The message is now encrypted\n");
+  // Print the encrypted message as a base64 string
+  char* b64String = base64Encode(encMsg, encMsgLen);
+  printf("Encrypted message: %s\n", b64String);
+
+  if((decMsgLen = rsa_decrypt(encMsg, (size_t)encMsgLen, ek, ekl, iv, ivl, (u_char**)&decMsg, config.rcv_priv_key, &config.rsa_de )) == -1) 
+    {
+      fprintf(stderr, "Decryption failed\n");
+      return 1;
+    }
+  printf("Decrypted message: %s %d\n", decMsg, decMsgLen);
+
+
+}
+
 int main(int argc, char** argv)
 {
   u_char buf[PACKET_SIZE];
@@ -475,7 +557,7 @@ int main(int argc, char** argv)
   int tun_frame_cap_len,rad_ret;
   const u_char * radiotap_packet;
   struct pcap_pkthdr header;
-  char * mon_ifname="phy6";  
+  char * mon_ifname="phy6";
   config.shared_key = (u_char*)"20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
   u_char k[]="20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
   config.shared_key_len=sizeof(k);
@@ -534,11 +616,18 @@ int main(int argc, char** argv)
     fprintf(stderr, "tunnel interface allocation failed\n");
     exit(-1);
   }
-
+  //RSA assymetric key cipher
+  rsa_decrypt_init(&config.rsa_de);
+  rsa_encrypt_init(&config.rsa_en);
+  rsa_key_setup();
+  test();
+  //AES symmetric key cipher
   if (aes_init(config.shared_key, config.shared_key_len, (unsigned char *)&config.salt, &config.en, &config.de)) {
     printf("Couldn't initialize AES cipher\n");
     return -1;
   }
+
+
   printf("allocted tunnel interface %s\n", ifname);
   
   int maxfd = (config.tun_fd > config.pcap_fd)?config.tun_fd:config.pcap_fd;  
