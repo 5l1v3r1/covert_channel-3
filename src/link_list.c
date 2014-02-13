@@ -135,6 +135,7 @@ int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_l
 
   free(fetch_node);
   list_size--;
+  return 0;
 }
 
 int test_suit()
@@ -168,5 +169,5 @@ int test_suit()
   printf("$$\n");
   beg_del_element(&head, &d2, &l2, &hmac);
   print_list(head);
-
+  return 0;
 }
