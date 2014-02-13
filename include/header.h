@@ -100,4 +100,4 @@ struct ssl_hdr {
   u8 ssl_content_type;
   u16 version;
   u16 length;
-};
+}__attribute__ ((packed));

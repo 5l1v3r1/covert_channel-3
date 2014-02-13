@@ -38,7 +38,6 @@ int aes_init(unsigned char *key_data, int key_data_len, unsigned char *salt, EVP
   return 0;
 }
 
-
 int rsa_encrypt_init(EVP_CIPHER_CTX *rsa_en)
 {
   EVP_CIPHER_CTX_init(rsa_en); 
