@@ -83,7 +83,8 @@ int tun_allocation(char *dev)
     return fd;
 }
 
-pcap_t * pcap_radiotap_handler(char * monitor_interface){
+pcap_t * pcap_radiotap_handler(char * monitor_interface)
+{
   pcap_t *pcap;
   pcap=pcap_open_live(monitor_interface, 1500 , 1,20, errbuf);//check the timeout value 
   if( pcap == NULL)
@@ -103,7 +104,9 @@ pcap_t * pcap_radiotap_handler(char * monitor_interface){
   return pcap;
 }
 
-int transmit_on_wifi(pcap_t* pd, u_char* fr_to_tx, int pkt_len)
+int transmit_on_wifi(pcap_t* pd, 
+		     u_char* fr_to_tx,
+		     int pkt_len)
 {
   //open pcap file descripter
   //modify the radiotap IEEE80211_RADIOTAP_F_FCS bit in radiotap 
@@ -137,7 +140,9 @@ u_int32_t covert_message_offset(u_int32_t seq,u_int32_t ack, u_int32_t pkt_len)
   get the tun frame that should be written to the tun descriptor
 
 */
-int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int32_t capture_len)
+int message_reception(const unsigned char * packet, 
+		      u_int16_t radiotap_len,
+		      u_int32_t capture_len)
 {
   struct ip *ip;
   struct llc_hdr *llc;
@@ -213,14 +218,16 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
     u_char* sha_decr_frame;
     int return_val;
     printf("trying uncompress\n");
-    return_val =uncompress_cipher_frame(&uncompressed_cipher_frame, compressed_message, &uncompressed_frame_len, (ulong) compressed_covert_mesg_size);
+    return_val =uncompress_cipher_frame(&uncompressed_cipher_frame, compressed_message, \
+					&uncompressed_frame_len, (ulong) compressed_covert_mesg_size);
     if(return_val ==EXIT_FAILURE) {
         free(hmac);
         free(compressed_message);
         return -1;
     }
     printf("uncompressed successfully\n");
-    return_val =decrypt_digest(&config.de, uncompressed_cipher_frame, &sha_decr_frame, &decrypted_tun_frame, (int*)&uncompressed_frame_len, config.shared_key, config.shared_key_len);
+    return_val =decrypt_digest(&config.de, uncompressed_cipher_frame, &sha_decr_frame, \
+			       &decrypted_tun_frame, (int*)&uncompressed_frame_len, config.shared_key, config.shared_key_len);
     if (return_val <0) {
         free(hmac);
         free(compressed_message);
@@ -251,7 +258,9 @@ int message_reception(const unsigned char * packet, u_int16_t radiotap_len,u_int
 /*
   The function is called when a copy of wireless frame transmitted.
 */
-int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int32_t capture_len)
+int message_injection(const unsigned char * packet,
+		      u_int16_t radiotap_len,
+		      u_int32_t capture_len)
 {
   printf("message_injection() %d\n",list_size);
   if (!(list_size>0))
@@ -352,7 +361,6 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     memcpy(frame_to_transmit, llc_start_p, ssl_hdr_end_p - llc_start_p );
     frame_to_transmit += ssl_hdr_end_p-llc_start_p;
     
-
     memcpy(frame_to_transmit,ssl_hdr_end_p,message_offset);
     frame_to_transmit +=message_offset;
     packet += message_offset;
@@ -387,44 +395,42 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
   return 0 ;
 }
 
-int packet_parse(const unsigned char *packet, struct timeval ts,unsigned int capture_len)
+int packet_parse(const unsigned char *packet,
+		 struct timeval ts,
+		 unsigned int capture_len)
 {
   u_int16_t radiotap_len=0;
   struct ieee80211_radiotap_header *hdr;
   hdr = (struct ieee80211_radiotap_header *)packet;
   radiotap_len = pletohs(&hdr->it_len);
-  if (capture_len <1400)
-    { /*messages are contained in large frames only*/
+  if (capture_len <1400) { /*messages are contained in large frames only*/
       return -1;
-    }
-  if (radiotap_len ==14)
-    {
-      printf("injection caplen->%d\n",capture_len);
+  }
+  if (radiotap_len ==14) {
+    printf("injection caplen->%d\n",capture_len);
       message_injection(packet, radiotap_len, capture_len); 
-    }
-  else 
-    { /*need frames that are sent out through device */
-      //printf("#");//reception caplen->%d\n",capture_len);
-      //message_reception(packet, radiotap_len, capture_len); //to be enabled at receiver side
-    }
+  }
+  else { /*need frames that are sent out through device */
+    //printf("#");//reception caplen->%d\n",capture_len);
+    //message_reception(packet, radiotap_len, capture_len); //to be enabled at receiver side
+  }
     return 0;
 }
 
-int check_tun_frame_content(u_char* orig_covert_frame, int tun_frame_cap_len)
+int check_tun_frame_content(u_char* orig_covert_frame, 
+			    int tun_frame_cap_len)
 {
   struct ip *ip;
   struct udp_hdr *udp;
   
   ip = (struct ip *)orig_covert_frame;
-  if (tun_frame_cap_len < ip->ip_hl*4 )
-    { /* didn't capture the full IP header including options */
+  if (tun_frame_cap_len < ip->ip_hl*4 ) { /* didn't capture the full IP header including options */
       printf("IP header with options\n");
       return -1;
-    }
-    int src_addr =0;
-    src_addr = inet_addr("10.0.0.12");
-  if (ip->ip_p == IPPROTO_UDP)
-    {
+  }
+  int src_addr =0;
+  src_addr = inet_addr("10.0.0.12");
+  if (ip->ip_p == IPPROTO_UDP) {
       printf("UDP packet on TUN interface\n");
       /* Skip over the IP header to get to the UDP header. */
       orig_covert_frame += ip->ip_hl*4;
@@ -433,59 +439,64 @@ int check_tun_frame_content(u_char* orig_covert_frame, int tun_frame_cap_len)
 	     ntohs(udp->uh_sport),
 	     ntohs(udp->uh_dport),
 	     ntohs(udp->uh_ulen));
-    }
-  else if (ip->ip_p == IPPROTO_TCP)
-    {
+  }
+  else if (ip->ip_p == IPPROTO_TCP) {
       printf("TCP packet %d\n",ip->ip_p);
-    }
-  else
-    {
-      printf("none of the protocol; ICMP mostly ?\n");
-    }
-    int temp = ip->ip_src.s_addr;
-    printf("src=%x \n",ip->ip_src.s_addr);
-    printf("dst=%x \n",ip->ip_dst.s_addr);
-    printf("src_addr=%x  %x\n",src_addr,temp);
-    if (temp==src_addr)
-    {
-        printf("bad\n");
-        return -1;
-    }
-    else
-    {
-        printf("good\n");
-        return 0;
-    }
+  }
+  else {
+    printf("none of the protocol; ICMP mostly ?\n");
+  }
+  int temp = ip->ip_src.s_addr;
+  printf("src=%x \n",ip->ip_src.s_addr);
+  printf("dst=%x \n",ip->ip_dst.s_addr);
+  printf("src_addr=%x  %x\n",src_addr,temp);
+  if (temp==src_addr) {
+      printf("bad\n");
+      return -1;
+  }
+  else {
+    printf("good\n");
+    return 0;
+  }
 }
 
-int rsa_key_setup()
+int rsa_client_priv_key()
+{
+
+  RSA *rsa_privkey = NULL;
+  FILE*rsa_privkey_file;
+  config.rcv_priv_key = EVP_PKEY_new();
+  rsa_privkey_file = fopen("./keys/privkey.pem", "rb");
+
+  if (!rsa_privkey_file) {
+      fprintf(stderr, "Error loading PEM RSA Private Key File.\n");
+      return -1;
+  }
+  
+  if (!PEM_read_RSAPrivateKey(rsa_privkey_file, &rsa_privkey, NULL, NULL)) {
+    fprintf(stderr, "Error loading RSA Private Key File.\n");
+    ERR_print_errors_fp(stderr);
+    return -1;
+  }
+
+  if (!EVP_PKEY_assign_RSA(config.rcv_priv_key, rsa_privkey)) {
+      fprintf(stderr, "EVP_PKEY_assign_RSA: failed.\n");
+      return -1;
+  }
+  return 0;
+}
+
+int rsa_server_pub_key()
 {
   RSA *rsa_pubkey = NULL;
   FILE* rsa_pubkey_file;
-  RSA *rsa_privkey = NULL;
-  FILE*rsa_privkey_file;
   config.snd_pub_key  = EVP_PKEY_new();
-  config.rcv_priv_key = EVP_PKEY_new();
   rsa_pubkey_file = fopen("./keys/publickey.pub", "rb");
-  rsa_privkey_file = fopen("./keys/privkey.pem", "rb");
-  if (!rsa_pubkey_file)
-    {    
-      fprintf(stderr, "Error loading PEM RSA Private Key File.\n");
-      return -1;
-    }
 
-  if (!PEM_read_RSAPrivateKey(rsa_privkey_file, &rsa_privkey, NULL, NULL))
-    {
-      fprintf(stderr, "Error loading RSA Private Key File.\n");
-      ERR_print_errors_fp(stderr);
+  if (!rsa_pubkey_file) {    
+      fprintf(stderr, "Error loading PEM RSA Public Key File.\n");
       return -1;
-    }
-
-  if (!EVP_PKEY_assign_RSA(config.rcv_priv_key, rsa_privkey))
-    {
-      fprintf(stderr, "EVP_PKEY_assign_RSA: failed.\n");
-      return -1;
-    }
+  }
 
   if (!PEM_read_RSA_PUBKEY(rsa_pubkey_file, &rsa_pubkey, NULL, NULL))
     {
@@ -499,43 +510,10 @@ int rsa_key_setup()
       fprintf(stderr, "EVP_PKEY_assign_RSA: failed.\n");
       return -1;
     }
+
   return 0;
 }
 
-int test()
-{
-  u_char *encMsg = NULL;
-  char *decMsg   = NULL;
-  int encMsgLen;
-  int decMsgLen;
-  u_char *ek ; 
-  u_char *iv ;
-  size_t ekl ;
-  size_t ivl ;
-  u_char *msg = "abhinav is the most guy";
-  int msg_len = strlen("abhinav is the most guy");
-  if((encMsgLen = rsa_encrypt((const u_char*)msg, msg_len+1, &encMsg, &ek, &ekl, &iv, &ivl, config.snd_pub_key, &config.rsa_en))== -1)
-    {
-      fprintf(stderr, "Encryption failed\n");
-      return 1;
-    }
-
-  printf(" ekl=%d ivl=%d encMsgLen=%d\n",ekl,ivl,encMsgLen);
-
-  printf("The message is now encrypted\n");
-  // Print the encrypted message as a base64 string
-  char* b64String = base64Encode(encMsg, encMsgLen);
-  printf("Encrypted message: %s\n", b64String);
-
-  if((decMsgLen = rsa_decrypt(encMsg, (size_t)encMsgLen, ek, ekl, iv, ivl, (u_char**)&decMsg, config.rcv_priv_key, &config.rsa_de )) == -1) 
-    {
-      fprintf(stderr, "Decryption failed\n");
-      return 1;
-    }
-  printf("Decrypted message: %s %d\n", decMsg, decMsgLen);
-
-
-}
 
 int main(int argc, char** argv)
 {
@@ -546,8 +524,23 @@ int main(int argc, char** argv)
   struct pcap_pkthdr header;
   char * mon_read_ifname="phy0";
   char * mon_inject_ifname="phy2";
+
+  u_char *ek ;
+  u_char *iv ;
+  size_t ekl ;
+  size_t ivl ;
+  int msg_len ;
+  u_char* msg ;
+  u_char* encMsg;
+  u_char* decMsg;
+  int encMsgLen,decMsgLen;
+
+  msg= "abhinav is the most guy";  
+  msg_len= strlen("abhinav is the most guy");
+
   config.shared_key = (u_char*)"20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
   u_char k[]="20142343243243935943uireuw943uihflsdh3otu4tjksdfj43p9tufsdfjp9943u50943";
+
   config.shared_key_len=sizeof(k);
   memcpy(config.salt, (u_int32_t[]) {12345, 54321}, sizeof config.salt);
   config.tun_f_list =NULL;
@@ -555,11 +548,12 @@ int main(int argc, char** argv)
   extern char *optarg;
   extern int optind;
   int c, check=0, err=0;
-  int tflag=0, readmon_flag=0,injectmon_flag=0;
+  int tflag=0, readmon_flag=0,injectmon_flag=0,mode_flag=0;
   char *tun_ifname = "tun2";
-  static char usage[] = "usage: %s [-d] -r read_interface -i inject_inteface [-s tun_ifname] \n";
+  char mode;
+  static char usage[] = "usage: %s [-d] -r read_interface -i inject_inteface -m mode [-s tun_ifname] \n";
 
-  while ((c = getopt(argc, argv, "dtr:i:")) != -1)
+  while ((c = getopt(argc, argv, "dtr:i:m:")) != -1)
     switch (c) {
     case 'd':
       debug = 1;
@@ -576,28 +570,41 @@ int main(int argc, char** argv)
       injectmon_flag = 1;
       mon_inject_ifname = optarg;
       break;
+    case 'm':
+      mode_flag = 1;
+      mode = atoi(optarg);
+      printf("%d\n",mode);
+      if (mode =='c' || mode =='s') {
+	printf("Use (c)lient or (s)erver mode\n");
+	exit(-1);
+      }else {
+	printf("uck\n");
+      }
+      break;
     case '?':
       err = 1;
       break;
     }
   
   if (readmon_flag == 0) {/* -r is mandatory */
-      fprintf(stderr, "%s: missing -r option\n", argv[0]);
-      fprintf(stderr, usage, argv[0]);
-      exit(-1);
+    fprintf(stderr, "%s: missing -r option\n", argv[0]);
+    fprintf(stderr, usage, argv[0]);
+    exit(-1);
   } else if(injectmon_flag==0) {
     fprintf(stderr, "%s: missing -i option\n", argv[0]);
     fprintf(stderr, usage, argv[0]);
     exit(-1);
-  }
-  else if ((optind+1) < argc) {
-    /* need at least one argument (change +1 to +2 for two, etc. as needeed) */
-    printf("optind = %d, argc=%d\n", optind, argc);
-    fprintf(stderr, "%s: fumissing name\n", argv[0]);
+  } else if(mode_flag==0) {
+    fprintf(stderr, "%s: missing -m option\n", argv[0]);
     fprintf(stderr, usage, argv[0]);
     exit(-1);
-  } 
-  else if (err) {
+  } else if ((optind+1) < argc) {
+    /* need at least one argument (change +1 to +2 for two, etc. as needeed) */
+    printf("optind = %d, argc=%d\n", optind, argc);
+    fprintf(stderr, "%s: missing name\n", argv[0]);
+    fprintf(stderr, usage, argv[0]);
+    exit(-1);
+  } else if (err) {
     fprintf(stderr, usage, argv[0]);
     exit(-1);
   }
@@ -608,12 +615,14 @@ int main(int argc, char** argv)
     fprintf(stderr, "pcap_setnonblock failed: %s\n", errbuf);
     exit(-1);
   }  
-*/
+  */
   config.wifi_read_pcap= pcap_radiotap_handler(mon_read_ifname);
+
   if (config.wifi_read_pcap ==NULL) {
     fprintf(stderr,"pcap file descriptor not avaiable:%s\n",errbuf);
     exit(-1);
   }
+
   if (pcap_setnonblock(config.wifi_read_pcap, 1, errbuf) == -1) {
     fprintf(stderr, "pcap_setnonblock failed: %s\n", errbuf);
     exit(-1);
@@ -628,10 +637,34 @@ int main(int argc, char** argv)
   }
   
   //RSA assymetric key cipher
-  rsa_decrypt_init(&config.rsa_de);
-  rsa_encrypt_init(&config.rsa_en);
-  rsa_key_setup();
-  test();
+  
+  if (mode =='s') {
+    rsa_encrypt_init(&config.rsa_en);
+    rsa_server_pub_key();    
+    if((encMsgLen = rsa_encrypt((const u_char*)msg, msg_len+1, &encMsg, &ek, &ekl, *iv, &ivl, \
+				config.snd_pub_key, &config.rsa_en))== -1) {
+      fprintf(stderr, "Encryption failed\n");
+      return -1;
+    }
+    
+    printf(" ekl=%d ivl=%d encMsgLen=%d\n",ekl,ivl,encMsgLen);
+    
+    printf("The message is now encrypted\n");
+    // Print the encrypted message as a base64 string
+    if (debug) {
+      char* b64String = base64Encode(encMsg, encMsgLen);
+      printf("Encrypted message: %s\n", b64String);
+    }
+  } else if (mode =='c') {
+    rsa_decrypt_init(&config.rsa_de);  
+    rsa_client_priv_key();
+    if((decMsgLen = rsa_decrypt(encMsg, (size_t)encMsgLen, ek, (size_t) ekl, iv, (size_t) ivl, (u_char**)&decMsg, \
+				config.rcv_priv_key, &config.rsa_de )) == -1) {
+      fprintf(stderr, "Decryption failed\n");
+      return -1;
+    }
+    printf("Decrypted message: %s %d\n", decMsg, decMsgLen);
+  }
   //AES symmetric key cipher
   if (aes_init(config.shared_key, config.shared_key_len, (unsigned char *)&config.salt, &config.en, &config.de)) {
     printf("Couldn't initialize AES cipher\n");
