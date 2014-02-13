@@ -19,7 +19,7 @@
 #define SHORT_SIZE 2
 #define SHA_SIZE 32
 
-struct node{
+struct node {
   u_char* data;
   int data_len;
   u_char* cipher_data;
@@ -33,8 +33,9 @@ typedef struct node node;
 
 typedef struct global_config {
   int tun_fd;
-  int pcap_fd;
-  pcap_t* wifi_pcap;
+  int pcap_read_fd;
+  pcap_t* wifi_read_pcap;
+  pcap_t* wifi_inject_pcap;
 
   u_char* shared_key;
   int shared_key_len;
