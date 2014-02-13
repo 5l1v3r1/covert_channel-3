@@ -268,10 +268,8 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
   const u_char* mac_address_start;
   const u_char* llc_start_p ;
 
-  u_char * test_start_packet = packet;
   packet += radiotap_len;
   capture_len -= radiotap_len;
-  printf("after radiotap: capture=%d, diff =%d\n",capture_len,packet-test_start_packet);
   fc = EXTRACT_LE_16BITS(packet);
   struct ieee80211_hdr * sc = (struct ieee80211_hdr *)packet;
   duration_id= sc->duration_id;
@@ -283,7 +281,6 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
   packet +=(mac_hdr_len+8);
   llc_start_p= packet-10; 
   capture_len -= (mac_hdr_len+8);
-  printf("before eth: capture=%d, diff =%d\n",capture_len,packet-test_start_packet);
   llc = (struct llc_hdr *) packet;
   if (ntohs(llc->snap.ether_type) == ETHERTYPE_IP) {
     packet +=sizeof(struct llc_hdr);
@@ -296,7 +293,6 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     packet += IP_header_length;
     capture_len -= IP_header_length;
 
-  printf("after ip: capture=%d, diff =%d\n",capture_len,packet-test_start_packet);
     tcp_h = (struct tcp_hdr *)packet;
     //printf("sport number = %d, seq no. = %u,ack no. = %u
     //\n",ntohs(tcp_h->dport),ntohl(tcp_h->seq),ntohl(tcp_h->ack));
@@ -305,10 +301,8 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     packet +=sizeof(struct tcp_hdr);
     capture_len -= sizeof(struct tcp_hdr);
 
-  printf("after tcp hdr:capture=%d, diff =%d\n",capture_len,packet-test_start_packet);
     packet += tcp_options;
     capture_len -= tcp_options;
-  printf("after options: capture=%d, diff =%d\n",capture_len,packet-test_start_packet);
     ssl_h = (struct ssl_hdr *)packet;
     if (ssl_h->ssl_content_type != 0x17) {
       return -1; /*not SSL traffic*/
@@ -318,7 +312,6 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
 
     packet += sizeof(struct ssl_hdr);
     capture_len -= sizeof(struct ssl_hdr);
-  printf("ssl: capture=%d, diff =%d\n",capture_len,packet-test_start_packet);
     const u_char * ssl_hdr_end_p = packet ; 
     int remaining_bytes=capture_len-(CRC_BYTES_LEN+ H_MAC_BYTES_LEN+ MSG_BYTES_LEN+ message_offset);
     if (remaining_bytes <MAX_MTU_SIZE+1) {
@@ -365,26 +358,22 @@ int message_injection(const unsigned char * packet,u_int16_t radiotap_len, u_int
     packet += message_offset;
     capture_len -= message_offset;
 
-  printf("after offset: capture=%d, diff =%d\n",capture_len,packet-test_start_packet);
     memcpy(frame_to_transmit,(u_char*)&message_len,SHORT_SIZE); 
     frame_to_transmit +=SHORT_SIZE;
     packet += SHORT_SIZE;
     capture_len -= SHORT_SIZE;
 
-  printf("after short: capture=%d, diff =%d\n",capture_len,packet-test_start_packet);
     memcpy(frame_to_transmit,hmac,SHA_SIZE);
     frame_to_transmit +=SHA_SIZE;
     packet += SHA_SIZE;
     capture_len -= SHA_SIZE;
 
-  printf("after SHA: capture=%d, diff =%d\n",capture_len,packet-test_start_packet);
     memcpy(frame_to_transmit, content,message_len);
     printf("fr_to_tx: %02x %02x %02x %02x \n",*(frame_to_transmit),*(frame_to_transmit+1),*(frame_to_transmit+2), *(frame_to_transmit+3));
     frame_to_transmit +=message_len ;
     packet += message_len;
     capture_len -= message_len;
 
-  printf("after mesg: capture=%d, diff =%d\n",capture_len,packet-test_start_packet);
     memcpy(frame_to_transmit,packet,pkt_len-capture_len);
     frame_to_transmit += (pkt_len-capture_len);
     capture_len -= (pkt_len-capture_len); 
@@ -639,12 +628,10 @@ int main(int argc, char** argv)
   }
   
   //RSA assymetric key cipher
-  /*
   rsa_decrypt_init(&config.rsa_de);
   rsa_encrypt_init(&config.rsa_en);
   rsa_key_setup();
   test();
-*/ 
   //AES symmetric key cipher
   if (aes_init(config.shared_key, config.shared_key_len, (unsigned char *)&config.salt, &config.en, &config.de)) {
     printf("Couldn't initialize AES cipher\n");
