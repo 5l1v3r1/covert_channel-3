@@ -14,7 +14,7 @@ int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
   memset(element, 0, sizeof(element));
   element->data = malloc(data_blob_size);
   
-  if (element->data ==NULL){
+  if (element->data ==NULL) {
     printf("malloc failed in beg_add_element()\n");
     return -1;
   }
@@ -22,28 +22,24 @@ int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
   memcpy(element->data,data_blob,data_blob_size);
   element->cipher_data_len = data_blob_size;
   return_val =encrypt_digest(&config.en, element->data,&(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
-  if (return_val ==EXIT_FAILURE)
-  {
+  if (return_val ==EXIT_FAILURE) {
     free(element);
     return -1;
   }
   element->compressed_data_len = compressBound(element->cipher_data_len);
   return_val =compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
-  if (return_val <0)
-  {
+  if (return_val <0) {
     free(element);
     return -1;
   }
-  if (*p_head ==NULL)
-    {
-      *p_head =element;
-      (*p_head)->next = NULL;
-    }
-  else
-    {
-      element->next =*p_head;
-      *p_head = element;
-    }
+  if (*p_head ==NULL) {
+    *p_head =element;
+    (*p_head)->next = NULL;
+  }
+  else {
+    element->next =*p_head;
+    *p_head = element;
+  }
   list_size++;
   return 0;
 }
@@ -66,32 +62,28 @@ int end_add_element(node **p_head , u_char * data_blob, int data_blob_size)
   memcpy(element->data,data_blob,data_blob_size);
   element->cipher_data_len = data_blob_size;
   return_val=encrypt_digest(&config.en, element->data, &(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
-  if (return_val==EXIT_FAILURE)
-  {
+  if (return_val==EXIT_FAILURE) {
     free(element);
     return -1;
   }
   element->compressed_data_len = compressBound(element->cipher_data_len);
   return_val=compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
-  if(return_val<0)
-  {
+  if(return_val<0) {
     free(element);
     return -1;
   }
   temp = *p_head ;
-  if (*p_head ==NULL)
-    {
-      *p_head = element;
-      (*p_head)->next = NULL;
-    }
-  else
-    {
-      while (temp->next !=NULL)
-	    temp=temp->next;
-      element->next =NULL;
-      temp->next=element;
-    }
-
+  if (*p_head ==NULL) {
+    *p_head = element;
+    (*p_head)->next = NULL;
+  }
+  else {
+    while (temp->next !=NULL)
+      temp=temp->next;
+    element->next =NULL;
+    temp->next=element;
+  }
+  
   list_size++;
   return 0;
 }
@@ -104,8 +96,7 @@ int print_list(node *p)
   node * start ;
   start= p ;
   int idx =0;
-  while (start !=NULL)
-    {
+  while (start !=NULL) {
       printf("(%d) %d: %s\n",idx++, start->data_len, start->data);
       start = start->next;
     }
@@ -118,11 +109,10 @@ int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_l
 {
   node * fetch_node;
   fetch_node = *p_head ;
-  if (fetch_node ==NULL && list_size==0)
-    {
+  if (fetch_node ==NULL && list_size==0) {
       printf("list is empty\n");
       return -1; //empty list
-    }
+  }
   *p_head=fetch_node->next;
   *fetch_data = malloc(fetch_node->compressed_data_len);
   memset(*fetch_data,0, fetch_node->compressed_data_len);

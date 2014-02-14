@@ -53,6 +53,19 @@ typedef struct global_config {
   EVP_CIPHER_CTX rsa_en;
   EVP_CIPHER_CTX rsa_de;
 
+  u_char* encr_shared_key;
+  int encr_shared_key_len;
+  
+  u_char* decr_shared_key;
+  int decr_shared_key_len;
+
+  u_char *rsa_ek;
+  u_char *rsa_iv;
+
+  size_t rsa_ekl;
+  size_t rsa_ivl;
+
+  int session_key_exchanged;
 } config_;
 extern config_ config;
 
