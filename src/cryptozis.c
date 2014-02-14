@@ -192,7 +192,6 @@ int  uncompress_cipher_frame(u_char** pUncomp_cipher_frame,
   return 0;
 }
 
-
 int rsa_encrypt(const u_char *msg,
 		size_t msgLen,
 		u_char **encMsg,
