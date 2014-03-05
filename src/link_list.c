@@ -21,11 +21,30 @@ int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
   element->data_len=data_blob_size;
   memcpy(element->data,data_blob,data_blob_size);
   element->cipher_data_len = data_blob_size;
-  return_val =encrypt_digest(&config.en, element->data,&(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
+  return_val =encrypt_digest(&config.en, element->data, &(element->cipher_data), &(element->cipher_data_len));
   if (return_val ==EXIT_FAILURE) {
     free(element);
     return -1;
   }
+
+  u_char * tmp;
+  tmp = HMAC(EVP_sha256(), config.shared_key, config.shared_key_len, element->cipher_data, (const int) (element->cipher_data_len), NULL, NULL);
+  if (tmp ==NULL)
+    return -1;
+ /*int idx=0;
+  printf("tmp \n");
+  for(idx=0;idx<32;idx++)
+	printf("%02x ",tmp[idx]);
+  printf("\n"); */
+  element->hmac_zip_data =malloc(32);
+  memset(element->hmac_zip_data, 0, 32);
+  memcpy(element->hmac_zip_data, tmp,32);
+  /*printf("elem->hmac_ \n");
+  for(idx=0;idx<32;idx++)
+	printf("%02x ",element->hmac_zip_data[idx]);
+  printf("\n"); */
+
+
   element->compressed_data_len = compressBound(element->cipher_data_len);
   return_val =compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
   if (return_val <0) {
@@ -61,11 +80,27 @@ int end_add_element(node **p_head , u_char * data_blob, int data_blob_size)
   element->data_len = data_blob_size;
   memcpy(element->data,data_blob,data_blob_size);
   element->cipher_data_len = data_blob_size;
-  return_val=encrypt_digest(&config.en, element->data, &(element->hmac_zip_data), &(element->cipher_data), &(element->cipher_data_len), config.shared_key, config.shared_key_len);
+  return_val=encrypt_digest(&config.en, element->data, &(element->cipher_data), &(element->cipher_data_len));
   if (return_val==EXIT_FAILURE) {
     free(element);
     return -1;
   }
+  u_char * tmp;
+  tmp = HMAC(EVP_sha256(), config.shared_key, config.shared_key_len, element->cipher_data, (const int) (element->cipher_data_len), NULL, NULL);
+  if (tmp ==NULL)
+    return -1;
+/*int idx=0;
+  printf("tmp \n");
+  for(idx=0;idx<32;idx++)
+	printf("%02x ",tmp[idx]);
+  printf("\n"); */
+  element->hmac_zip_data =malloc(32);
+  memset(element->hmac_zip_data, 0, 32);
+  memcpy(element->hmac_zip_data, tmp,32);
+/*  printf("elem->hmac_ \n");
+  for(idx=0;idx<32;idx++)
+	printf("%02x ",element->hmac_zip_data[idx]);
+  printf("\n"); */
   element->compressed_data_len = compressBound(element->cipher_data_len);
   return_val=compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
   if(return_val<0) {
@@ -123,7 +158,19 @@ int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_l
   memset(*hmac_zip_data,0, SHA_SIZE);
   memcpy(*hmac_zip_data,fetch_node->hmac_zip_data, SHA_SIZE);
 
-  free(fetch_node);
+ /*FIXME: free the data and hmac fields too! will be mem leaks */
+/*  printf("in del_"); 
+int idx=0;
+ u_char * t= *hmac_zip_data;
+  for(idx=0;idx<32;idx++)
+	printf("%02x ",t[idx]);
+  printf("\n");
+*/
+ free(fetch_node->data);
+ free(fetch_node->hmac_zip_data);
+ free(fetch_node);
+
+
   list_size--;
   return 0;
 }
@@ -146,17 +193,17 @@ int test_suit()
   u_char * hmac;
   u_int16_t l1,l2;
   beg_del_element(&head, &d1, &l1, &hmac);
-  printf("the stuff that we got: %s %d\n",d1,l1);
+//  printf("the stuff that we got: %s %d\n",d1,l1);
   print_list(head );
-  printf("==\n");
+//  printf("==\n");
   beg_del_element(&head, &d2, &l2, &hmac);
-  printf("the stuff that we got: %s %d\n",d2,l2);
+//  printf("the stuff that we got: %s %d\n",d2,l2);
   print_list(head);
-  printf("@@\n");
+//  printf("@@\n");
   beg_del_element(&head, &d2, &l2, &hmac);
-  printf("the stuff that we got: %s %d\n",d2,l2);
+//  printf("the stuff that we got: %s %d\n",d2,l2);
   print_list(head);
-  printf("$$\n");
+//  printf("$$\n");
   beg_del_element(&head, &d2, &l2, &hmac);
   print_list(head);
   return 0;

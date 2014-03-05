@@ -37,11 +37,9 @@ int aes_init(unsigned char *key_data,
 
 int encrypt_digest(EVP_CIPHER_CTX *en,
 		   u_char *frame,
-		   u_char** sha_frame,
 		   u_char **encr_frame,
-		   int*encr_frame_len,
-		   u_char* key,
-		   int key_len);
+		   int*encr_frame_len
+		   );
 
 int decrypt_digest(EVP_CIPHER_CTX *de,
 		   u_char * pUncomp_cipher_frame, 

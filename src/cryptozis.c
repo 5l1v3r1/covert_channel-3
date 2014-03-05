@@ -97,21 +97,15 @@ Also gives the SHA 256 of the encrypted frame (cipher frame)
 */
 int encrypt_digest(EVP_CIPHER_CTX *en,
 		   u_char* frame,
-		   u_char** sha_frame,
 		   u_char** encr_frame,
-		   int* encr_frame_len,
-		   u_char* key,
-		   int key_len)
+		   int* encr_frame_len
+		   )
 {
   
   *encr_frame = aes_encrypt(en,frame, encr_frame_len);
   if (*encr_frame ==NULL)
     return -1;    
-  *sha_frame = HMAC(EVP_sha256(), key, key_len, *encr_frame, (const int) (*encr_frame_len), NULL, NULL);
-  if (*sha_frame ==NULL)
-    return -1;
-  else   
-    return 0;
+  return 0;
 }
 
 /*
