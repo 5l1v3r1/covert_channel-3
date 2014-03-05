@@ -281,7 +281,7 @@ int message_injection(const unsigned char * packet,
   fc = EXTRACT_LE_16BITS(packet);
   struct ieee80211_hdr * sc = (struct ieee80211_hdr *)packet;
   duration_id= sc->duration_id;
-  mac_address_start=(packet+4);
+  mac_address_start=(packet+4);//skip 4 bytes seq no ,fc 
   seq_no=sc->seq_ctrl;
   int mac_hdr_len  = (FC_TO_DS(fc) && FC_FROM_DS(fc)) ? 30 : 24;  
   if (DATA_FRAME_IS_QOS(FC_SUBTYPE(fc)))
@@ -472,7 +472,7 @@ int key_reception(const unsigned char * packet,
     printf("just before mallocs\n");
     covert_message = malloc((size_t)covert_mesg_size);
     memset(covert_message,0,(size_t)covert_mesg_size);
-    memcpy(covert_message,packet,(size_t)covert_mesg_size);
+    memcpy(covert_message,packet,sizeof(size_t)); // fix this tomm
     char k[]="abhinav";
     u_char * sha_256;
     printf("getting the sha");
