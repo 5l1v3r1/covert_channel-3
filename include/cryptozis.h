@@ -45,11 +45,9 @@ int encrypt_digest(EVP_CIPHER_CTX *en,
 
 int decrypt_digest(EVP_CIPHER_CTX *de,
 		   u_char * pUncomp_cipher_frame, 
-		   u_char** sha_frame,
 		   u_char **decr_frame,
-		   int* decr_frame_len,
-		   u_char* key,
-		   int key_len);
+		   int* decr_frame_len
+		   );
 
 int compress_cipher_frame(u_char **pCmp_cipher_frame,
 			  ulong *compressed_frame_len,	  

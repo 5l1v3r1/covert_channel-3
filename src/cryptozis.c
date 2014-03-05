@@ -120,20 +120,14 @@ Also gives the SHA 256 of the cipher text.
 */
 int decrypt_digest(EVP_CIPHER_CTX *de,
 		   u_char* pUncomp_cipher_frame, 
-		   u_char** sha_frame,
 		   u_char** decr_frame,
-		   int* decr_frame_len,
-		   u_char* key,
-		   int key_len)
+		   int* decr_frame_len
+		   )
 {
   *decr_frame = aes_decrypt(de, pUncomp_cipher_frame, decr_frame_len);
   if (*decr_frame ==NULL)
     return -1;
-  *sha_frame = HMAC(EVP_sha256(), key, key_len, *decr_frame, (const int)*decr_frame_len, NULL, NULL);
-  if (*sha_frame ==NULL)
-    return -1;
-  else   
-    return 0;
+  return 0;
 }
 
 /*
@@ -154,7 +148,7 @@ int compress_cipher_frame(u_char **pCmp_cipher_frame,
   cmp_status = compress(*pCmp_cipher_frame, compressed_frame_len, (const u_char *)cipher_frame, cipher_frame_len);
   if (cmp_status != Z_OK)
     {
-      printf("compress() failed!\n");
+      //printf("compress() failed!\n");
       free(pCmp_cipher_frame);
       return EXIT_FAILURE;
     }
@@ -177,7 +171,7 @@ int  uncompress_cipher_frame(u_char** pUncomp_cipher_frame,
   cmp_status = uncompress(temp, uncompressed_frame_len, pCmp_cipher_frame, compressed_frame_len);
   if (cmp_status != Z_OK)
     {
-      printf("uncompress failed!\n");
+    //  printf("uncompress failed!\n");
       return EXIT_FAILURE;
     }
   *pUncomp_cipher_frame = (u_int8_t *)malloc((size_t)*uncompressed_frame_len);

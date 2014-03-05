@@ -9,7 +9,7 @@
 #include <openssl/err.h>
 #include <pcap.h>
 #define SALT_SIZE 2
-#define PACKET_SIZE 1515
+#define PACKET_SIZE 65535
 #define CRC_BYTES_LEN 4
 #define H_MAC_BYTES_LEN 4 /*hmac of the message to be calculated and store. message will be stored in front of HMAC*/
 #define MSG_BYTES_LEN 4   /*gives the length of the encrypted message*/
@@ -62,8 +62,8 @@ typedef struct global_config {
   u_char *rsa_ek;
   u_char *rsa_iv;
 
-  size_t rsa_ekl;
-  size_t rsa_ivl;
+  /*size_t*/int  rsa_ekl;
+  /*size_t*/int rsa_ivl;
 
   int session_key_exchanged;
 } config_;
