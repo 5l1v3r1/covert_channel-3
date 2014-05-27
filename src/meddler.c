@@ -21,7 +21,7 @@
 
 
 static int cnt=0;
-static int c_128=0, c_48=0;
+static int c_80=0, c_64=0;
 
 u_int32_t total_byte=0;
 struct timeval first_pkt_time;
@@ -237,16 +237,17 @@ int message_reception(const unsigned char * packet,
     capture_len -= tcp_options;
     ssl_h = (struct ssl_hdr *)packet;
     //printf("message received bef ssl v= %02x %02x%02x\n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1),  *((u_int8_t*)(ssl_h)+2) );
+/*  Check for common SSL header bytes
     if (ssl_h->ssl_content_type != 0x17) {
       //printf("not 17\n");
-      return -1; /*there should be content in the traffic*/
+      return -1;
     }
-
+*/
     packet += sizeof(struct ssl_hdr);
     capture_len -= sizeof(struct ssl_hdr);
 
     int remaining_bytes=capture_len-(CRC_BYTES_LEN+ H_MAC_BYTES_LEN+ MSG_BYTES_LEN+ message_offset);
-    if (remaining_bytes <MAX_MTU_SIZE+1) {
+    if (remaining_bytes <120) {
       return -1; /*for now it's mtu=150 bytes*/
     }
     /* TODO:
@@ -277,9 +278,9 @@ int message_reception(const unsigned char * packet,
 	u_char* blob;
 	int frame_len, decrypted_tun_frame_len;
 	if (c & 1<<u) {
-	  frame_len =48; decrypted_tun_frame_len=48;
+	  frame_len =64; decrypted_tun_frame_len=48;
 	} else {
-	  frame_len =128; decrypted_tun_frame_len=128;
+	  frame_len =80; decrypted_tun_frame_len=128;
 	}
 	//printf("accum=%d\n",accum);
 	blob=encrypt_msg+accum; //(128+SHA_SIZE)*u;
@@ -306,16 +307,16 @@ int message_reception(const unsigned char * packet,
 	//u_char *t =decrypted_tun_frame;
 	//printf("decrypted correctly; ip:%02x %02x %02x %02x \n",*t,*(t+1),*(t+2),*(t+3));
 	if(!memcmp(sha_decr_frame,hmac,SHA_SIZE)) {
-	  if (decrypted_tun_frame_len ==124)
-	    c_128++;
-	  else if (decrypted_tun_frame_len ==42)
-	    c_48++;
+	  if (decrypted_tun_frame_len ==80)
+	    c_80++;
+	  else if (decrypted_tun_frame_len ==64)
+	    c_64++;
 	  else {
 	    printf("some random length %d\n", decrypted_tun_frame_len);
 	    exit(1);
 	  }
 	  //printf("ip:%02x %02x %02x %02x \n",*t,*(t+1),*(t+2),*(t+3));
-	  printf("map=%d 48=%d, 128=%d len=%d\n",c,c_48,c_128,decrypted_tun_frame_len);
+	  printf("map=%d 64=%d, 80=%d len=%d\n",c,c_64,c_80,decrypted_tun_frame_len);
 	  //printf("correct SHA and shoving to TUN %d\n",decrypted_tun_frame_len);
 	  if((bytes_written=write(config.tun_fd,decrypted_tun_frame,decrypted_tun_frame_len))<0) {
 	    perror("Error in writing the message frame to TUN interface\n");
@@ -426,9 +427,12 @@ int message_injection(const unsigned char * packet,
     packet += tcp_options;
     capture_len -= tcp_options;
     ssl_h = (struct ssl_hdr *)packet;
+/* better condition for a generic code to check SSL;
+    this is just for header
     if (ssl_h->ssl_content_type != 0x17) {
-      return -1; /*not SSL traffic*/
+      return -1; //not SSL traffic
     }
+    */
     printf("ssl v= %02x %02x%02x \n", *((u_int8_t*)(ssl_h)), *((u_int8_t*)(ssl_h)+1),
 	   *((u_int8_t*)(ssl_h)+2)  );
 
@@ -436,12 +440,15 @@ int message_injection(const unsigned char * packet,
     capture_len -= sizeof(struct ssl_hdr);
     const u_char * ssl_hdr_end_p = packet ;
     int remaining_bytes=capture_len-(CRC_BYTES_LEN+ H_MAC_BYTES_LEN+ MSG_BYTES_LEN+ message_offset);
-    if (remaining_bytes <100 ) {
+    if (remaining_bytes <120 ) {
       return -1; /*for now it's mtu=150 bytes*/
     }
-
+    /*
+    MDP paper suggests probabilities of injection and burst sizes.
+    Sticking to it and injecting only 1 frame per 802.11 frame.
+    */
     int noms_to_inject;
-    noms_to_inject= remaining_bytes/(128+32);
+    noms_to_inject= 1 ; //remaining_bytes/(128+32);
     u_char* frame_to_transmit=NULL;
     u_char* start_frame_to_transmit= malloc(pkt_len);
     memset(start_frame_to_transmit,'\0',sizeof(start_frame_to_transmit));
@@ -456,7 +463,10 @@ int message_injection(const unsigned char * packet,
       nRateIndex=0;
     frame_to_transmit += sizeof (u8aRadiotapHeader);
     frame_tx_idx  += sizeof (u8aRadiotapHeader);
-
+    /*
+    We can corrupt the FC, MAC sequence no. Not doing it for evaluation
+    of Denali
+    */
     struct ieee80211_hdr * ih = (struct ieee80211_hdr *) u8aIeeeHeader;
     //fc= fc | BIT(6); // for WEP bit to be turned on
     memcpy((u_char*)(&(ih->frame_control)),(u_char*)&fc,2);
@@ -490,7 +500,7 @@ int message_injection(const unsigned char * packet,
     frame_tx_idx += message_offset;
     capture_len -= message_offset;
 
-    message_len=noms_to_inject*(128+32);
+    message_len=noms_to_inject*(80+SHA_SIZE);//MTU of 70 maintained for minimal burst size
     u_char * map;
     map=frame_to_transmit;
     frame_to_transmit +=1;
@@ -507,7 +517,7 @@ int message_injection(const unsigned char * packet,
       Number of messages and the total message length to be added here
     */
     u_char c =0;
-    int u,r,msg_len=128;
+    int u,r,msg_len=80;
     for(u=0;u<noms_to_inject;u++) {
       u_char *hmac;
       u_char* content;
@@ -529,10 +539,10 @@ int message_injection(const unsigned char * packet,
       packet += msg_len;
       frame_tx_idx += msg_len;
       capture_len -= msg_len;
-      if (msg_len ==128){
-	c_128++;
-      }else if (msg_len ==48){
-	c_48++;
+      if (msg_len ==80){
+	c_80++;
+      }else if (msg_len ==64){
+	c_64++;
 	c |= 1 <<u;
       }else{
 	printf("TOFIX:msg_len=%d\n",msg_len);
@@ -554,8 +564,8 @@ int message_injection(const unsigned char * packet,
     frame_to_transmit += (pkt_len-frame_tx_idx);
     capture_len -= (pkt_len-frame_tx_idx);
     //while(1){
-    //printf("128=%d, 48=%d\n",c_128,c_48);
-    printf("pkt size=%d (pkt_len=%d  ==cap_len=%d)\n",(frame_to_transmit-start_frame_to_transmit),pkt_len,capture_len);
+    printf("80=%d, 64=%d\n",c_80,c_64);
+    //printf("pkt size=%d (pkt_len=%d  ==cap_len=%d)\n",(frame_to_transmit-start_frame_to_transmit),pkt_len,capture_len);
     if (pkt_len ==capture_len) {
       printf("wrong!");
       exit(1);
@@ -883,13 +893,13 @@ int packet_parse(const unsigned char *packet,
   if (1 /*config.session_key_exchanged*/) {
     if (radiotap_len ==13) {
       printf("message injection caplen->%d rad=%d\n",capture_len, radiotap_len);
-      /*
 	int k=0;
 	modulo++;
-	k=modulo%10;
-	if (modulo%3==0 || modulo%5==0 || modulo%7==0){
+	k=modulo%1000; //This has to be the frequency for complete deniability!
+	//if (modulo%3==0 || modulo%5==0 || modulo%7==0){
+    if (k==0) {
 	} else{
-      */
+      
       message_injection(packet, radiotap_len, capture_len);
       //	}
     }
