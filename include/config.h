@@ -24,9 +24,7 @@ struct node {
   int data_len;
   u_char* cipher_data;
   int cipher_data_len;
-  u_char* compressed_data;
-  ulong compressed_data_len;
-  u_char * hmac_zip_data;
+  u_char* hmac_cipher_data;
   struct node *next;
 };
 typedef struct node node;
