@@ -15,7 +15,7 @@ OBJECTS= $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 EXECUTABLE=meddler
 
 $(BINDIR)/$(TARGET):$(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS)  -o $@
+	$(CC) $(LDFLAGS) $(OBJECTS)  -o $@  -lpcap -lcrypto -lm -lz
 	@echo "Built the binary"
 
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
