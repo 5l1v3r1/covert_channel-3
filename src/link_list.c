@@ -26,7 +26,6 @@ int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
     free(element);
     return -1;
   }
-
   u_char * tmp;
   tmp = HMAC(EVP_sha256(), config.shared_key, config.shared_key_len, element->cipher_data, (const int) (element->cipher_data_len), NULL, NULL);
   if (tmp ==NULL)
@@ -36,17 +35,14 @@ int beg_add_element(node ** p_head ,u_char *data_blob,int data_blob_size)
   for(idx=0;idx<32;idx++)
 	printf("%02x ",tmp[idx]);
   printf("\n"); */
-  element->hmac_zip_data =malloc(32);
-  memset(element->hmac_zip_data, 0, 32);
-  memcpy(element->hmac_zip_data, tmp,32);
+  element->hmac_cipher_data =malloc(32);
+  memset(element->hmac_cipher_data, 0, 32);
+  memcpy(element->hmac_cipher_data, tmp,32);
   /*printf("elem->hmac_ \n");
   for(idx=0;idx<32;idx++)
 	printf("%02x ",element->hmac_zip_data[idx]);
   printf("\n"); */
 
-
-  element->compressed_data_len = compressBound(element->cipher_data_len);
-  return_val =compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
   if (return_val <0) {
     free(element);
     return -1;
@@ -80,7 +76,9 @@ int end_add_element(node **p_head , u_char * data_blob, int data_blob_size)
   element->data_len = data_blob_size;
   memcpy(element->data,data_blob,data_blob_size);
   element->cipher_data_len = data_blob_size;
+ //printf("before cipher data length %d\n",element->cipher_data_len);
   return_val=encrypt_digest(&config.en, element->data, &(element->cipher_data), &(element->cipher_data_len));
+ //printf("after cipher data length %d\n",element->cipher_data_len);
   if (return_val==EXIT_FAILURE) {
     free(element);
     return -1;
@@ -94,15 +92,13 @@ int end_add_element(node **p_head , u_char * data_blob, int data_blob_size)
   for(idx=0;idx<32;idx++)
 	printf("%02x ",tmp[idx]);
   printf("\n"); */
-  element->hmac_zip_data =malloc(32);
-  memset(element->hmac_zip_data, 0, 32);
-  memcpy(element->hmac_zip_data, tmp,32);
+  element->hmac_cipher_data =malloc(32);
+  memset(element->hmac_cipher_data, 0, 32);
+  memcpy(element->hmac_cipher_data, tmp,32);
 /*  printf("elem->hmac_ \n");
   for(idx=0;idx<32;idx++)
 	printf("%02x ",element->hmac_zip_data[idx]);
   printf("\n"); */
-  element->compressed_data_len = compressBound(element->cipher_data_len);
-  return_val=compress_cipher_frame(&(element->compressed_data), &(element->compressed_data_len), element->cipher_data, element->cipher_data_len);
   if(return_val<0) {
     free(element);
     return -1;
@@ -140,7 +136,7 @@ int print_list(node *p)
 /*
   Fetches the packet buffer and the packet len from the linked list 
 */
-int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_len,u_char** hmac_zip_data )
+int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_len,u_char** hmac_cipher_data )
 {
   node * fetch_node;
   fetch_node = *p_head ;
@@ -149,28 +145,29 @@ int beg_del_element( node **p_head, u_char** fetch_data, u_int16_t *fetch_data_l
       return -1; //empty list
   }
   *p_head=fetch_node->next;
-  *fetch_data = malloc(fetch_node->compressed_data_len);
-  memset(*fetch_data,0, fetch_node->compressed_data_len);
-  memcpy(*fetch_data,fetch_node->compressed_data,fetch_node->compressed_data_len);
-  u_int16_t compressed_data_len= (u_int16_t) fetch_node->compressed_data_len;
-  *fetch_data_len =compressed_data_len;
-  *hmac_zip_data = malloc(SHA_SIZE);
-  memset(*hmac_zip_data,0, SHA_SIZE);
-  memcpy(*hmac_zip_data,fetch_node->hmac_zip_data, SHA_SIZE);
+  *fetch_data = malloc(fetch_node->cipher_data_len);
+  memset(*fetch_data,0, fetch_node->cipher_data_len);
+  memcpy(*fetch_data,fetch_node->cipher_data,fetch_node->cipher_data_len);
 
+  u_int16_t cipher_data_len= (u_int16_t) fetch_node->cipher_data_len;
+  *fetch_data_len =cipher_data_len;
+  *hmac_cipher_data = malloc(SHA_SIZE);
+  memset(*hmac_cipher_data,0, SHA_SIZE);
+  //printf("del 6\n");
+  memcpy(*hmac_cipher_data,fetch_node->hmac_cipher_data, SHA_SIZE);
+  //printf("del 7\n");
  /*FIXME: free the data and hmac fields too! will be mem leaks */
 /*  printf("in del_"); 
 int idx=0;
- u_char * t= *hmac_zip_data;
+ u_char * t= *hmac_cipher_data;
   for(idx=0;idx<32;idx++)
 	printf("%02x ",t[idx]);
   printf("\n");
 */
  free(fetch_node->data);
- free(fetch_node->hmac_zip_data);
+ free(fetch_node->hmac_cipher_data);
  free(fetch_node);
-
-
+ // printf("del 8\n");
   list_size--;
   return 0;
 }
@@ -179,7 +176,7 @@ int test_suit()
 {
   node * head =NULL;
   beg_add_element(&head,(u_char*) "abhinav", sizeof("abhinav"));
-  beg_add_element(&head,(u_char*) " narain", sizeof(" narain"));
+  beg_add_element(&head,(u_char*) "narain", sizeof("narain"));
   beg_add_element(&head,(u_char*) "this is a test suit",sizeof("this is a test suit"));
   //  end_add_element(&head,(u_char*) "this is another line in the test suite",sizeof("this is another line in the test suite"));
   //end_add_element(&head, (u_char*) "the last line that is ever going to be written in the test suite", \
@@ -193,17 +190,17 @@ int test_suit()
   u_char * hmac;
   u_int16_t l1,l2;
   beg_del_element(&head, &d1, &l1, &hmac);
-//  printf("the stuff that we got: %s %d\n",d1,l1);
+  //printf("the stuff that we got: %s %d\n",d1,l1);
   print_list(head );
-//  printf("==\n");
+  //printf("==\n");
   beg_del_element(&head, &d2, &l2, &hmac);
-//  printf("the stuff that we got: %s %d\n",d2,l2);
+  //printf("the stuff that we got: %s %d\n",d2,l2);
   print_list(head);
-//  printf("@@\n");
+  //printf("@@\n");
   beg_del_element(&head, &d2, &l2, &hmac);
-//  printf("the stuff that we got: %s %d\n",d2,l2);
+  //printf("the stuff that we got: %s %d\n",d2,l2);
   print_list(head);
-//  printf("$$\n");
+  //printf("$$\n");
   beg_del_element(&head, &d2, &l2, &hmac);
   print_list(head);
   return 0;
