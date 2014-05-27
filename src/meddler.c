@@ -353,7 +353,7 @@ int message_injection(const unsigned char * packet,
   seq_no=sc->seq_ctrl;
   int mac_hdr_len  = (FC_TO_DS(fc) && FC_FROM_DS(fc)) ? 30 : 24;  
   if (DATA_FRAME_IS_QOS(FC_SUBTYPE(fc)))
-    mac_hdr_len += 
+    mac_hdr_len += 2;
   packet +=(u_int8_t)(mac_hdr_len);
   capture_len -= mac_hdr_len;
   llc_start_p= packet-2;//2 bytes padding by atheros adapter
@@ -394,7 +394,7 @@ int message_injection(const unsigned char * packet,
     capture_len -= sizeof(struct ssl_hdr);
     const u_char * ssl_hdr_end_p = packet ; 
     int remaining_bytes=capture_len-(CRC_BYTES_LEN+ H_MAC_BYTES_LEN+ MSG_BYTES_LEN+ message_offset);
-    if (remaining_bytes <MAX_MTU_SIZE+1) {
+    if (remaining_bytes <100 ) {
       return -1; /*for now it's mtu=150 bytes*/
     }
     u_char *hmac;
